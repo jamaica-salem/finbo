@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
@@ -138,25 +139,46 @@ export default function LoansPage() {
         </div>
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Loan</Button>
+            <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Loan/Installment</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New Loan / Installment</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-              <Select value={loanType} onValueChange={(v) => setLoanType(v as 'loan' | 'installment')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="loan">Loan</SelectItem>
-                  <SelectItem value="installment">Installment</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input placeholder="Total amount" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
-              <Input placeholder="Monthly payment" type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} />
-              <Input placeholder="Interest rate %" type="number" value={interest} onChange={(e) => setInterest(e.target.value)} />
-              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-              <Button className="w-full" onClick={handleAdd}>Create</Button>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Name</Label>
+                <Input placeholder="e.g. Car Loan" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Type</Label>
+                <Select value={loanType} onValueChange={(v) => setLoanType(v as 'loan' | 'installment')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="loan">Loan</SelectItem>
+                    <SelectItem value="installment">Installment</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Total amount</Label>
+                <Input placeholder="0.00" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Monthly payment</Label>
+                <Input placeholder="0.00" type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Interest rate %</Label>
+                <Input placeholder="0" type="number" value={interest} onChange={(e) => setInterest(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Start date</Label>
+                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Due date</Label>
+                <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              </div>
+              <Button className="w-full mt-2" onClick={handleAdd}>Create</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -166,10 +188,16 @@ export default function LoansPage() {
       <Dialog open={!!payLoanId} onOpenChange={() => setPayLoanId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Log Payment</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Input placeholder="Payment amount" type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
-            <Input placeholder="Note (optional)" value={payNote} onChange={(e) => setPayNote(e.target.value)} />
-            <Button className="w-full" onClick={handlePay}>Log Payment</Button>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Payment amount</Label>
+              <Input placeholder="0.00" type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note (optional)</Label>
+              <Input placeholder="e.g. Extra payment" value={payNote} onChange={(e) => setPayNote(e.target.value)} />
+            </div>
+            <Button className="w-full mt-2" onClick={handlePay}>Log Payment</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -178,22 +206,46 @@ export default function LoansPage() {
       <Dialog open={!!editId} onOpenChange={() => setEditId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Loan / Installment</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Input placeholder="Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-            <Select value={editType} onValueChange={(v) => setEditType(v as 'loan' | 'installment')}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="loan">Loan</SelectItem>
-                <SelectItem value="installment">Installment</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input placeholder="Total amount" type="number" value={editTotal} onChange={(e) => setEditTotal(e.target.value)} />
-            <Input placeholder="Paid amount" type="number" value={editPaid} onChange={(e) => setEditPaid(e.target.value)} />
-            <Input placeholder="Monthly payment" type="number" value={editMonthly} onChange={(e) => setEditMonthly(e.target.value)} />
-            <Input placeholder="Interest rate %" type="number" value={editInterest} onChange={(e) => setEditInterest(e.target.value)} />
-            <Input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
-            <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
-            <Button className="w-full" onClick={handleEdit}>Save Changes</Button>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Name</Label>
+              <Input placeholder="e.g. Car Loan" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={editType} onValueChange={(v) => setEditType(v as 'loan' | 'installment')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="loan">Loan</SelectItem>
+                  <SelectItem value="installment">Installment</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Total amount</Label>
+              <Input placeholder="0.00" type="number" value={editTotal} onChange={(e) => setEditTotal(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Paid amount</Label>
+              <Input placeholder="0.00" type="number" value={editPaid} onChange={(e) => setEditPaid(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Monthly payment</Label>
+              <Input placeholder="0.00" type="number" value={editMonthly} onChange={(e) => setEditMonthly(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Interest rate %</Label>
+              <Input placeholder="0" type="number" value={editInterest} onChange={(e) => setEditInterest(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Start date</Label>
+              <Input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due date</Label>
+              <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+            </div>
+            <Button className="w-full mt-2" onClick={handleEdit}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>

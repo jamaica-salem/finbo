@@ -55,6 +55,3 @@ We use Prettier for code formatting. To format your code:
 npm run format
 ```
 
-## Contact
-
-For questions or support, please open an issue or contact the development team.

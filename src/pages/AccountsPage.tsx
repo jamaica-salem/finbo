@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Trash2, ArrowUpRight, ArrowDownRight, Wallet, Building2, Smartphone, Pencil } from 'lucide-react';
@@ -81,18 +82,27 @@ export default function AccountsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <Input placeholder="Account name" value={aName} onChange={(e) => setAName(e.target.value)} />
-                <Select value={aType} onValueChange={(v) => setAType(v as AccountType)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="bank">Bank</SelectItem>
-                    <SelectItem value="cash">Cash</SelectItem>
-                    <SelectItem value="e-wallet">E-Wallet</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input placeholder="Initial balance" type="number" value={aBal} onChange={(e) => setABal(e.target.value)} />
-                <Button className="w-full" onClick={handleAddAccount}>Add Account</Button>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Account name</Label>
+                  <Input placeholder="e.g. Main Bank" value={aName} onChange={(e) => setAName(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Type</Label>
+                  <Select value={aType} onValueChange={(v) => setAType(v as AccountType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank">Bank</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Initial balance</Label>
+                  <Input placeholder="0.00" type="number" value={aBal} onChange={(e) => setABal(e.target.value)} />
+                </div>
+                <Button className="w-full mt-2" onClick={handleAddAccount}>Add Account</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -102,30 +112,48 @@ export default function AccountsPage() {
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
-              <div className="space-y-3">
-                <Select value={txAccount} onValueChange={setTxAccount}>
-                  <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
-                  <SelectContent>
-                    {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={txType} onValueChange={(v) => setTxType(v as 'income' | 'expense')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="income">Income</SelectItem>
-                    <SelectItem value="expense">Expense</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input placeholder="Amount" type="number" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
-                <Select value={txCategory} onValueChange={setTxCategory}>
-                  <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
-                  <SelectContent>
-                    {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Input placeholder="Description" value={txDesc} onChange={(e) => setTxDesc(e.target.value)} />
-                <Input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
-                <Button className="w-full" onClick={handleAddTx}>Add Transaction</Button>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Account</Label>
+                  <Select value={txAccount} onValueChange={setTxAccount}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Transaction type</Label>
+                  <Select value={txType} onValueChange={(v) => setTxType(v as 'income' | 'expense')}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Income</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Amount</Label>
+                  <Input placeholder="0.00" type="number" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Category</Label>
+                  <Select value={txCategory} onValueChange={setTxCategory}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Description</Label>
+                  <Input placeholder="e.g. Groceries" value={txDesc} onChange={(e) => setTxDesc(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Date</Label>
+                  <Input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
+                </div>
+                <Button className="w-full mt-2" onClick={handleAddTx}>Add Transaction</Button>
               </div>
             </DialogContent>
           </Dialog>
@@ -136,18 +164,27 @@ export default function AccountsPage() {
       <Dialog open={!!editAccountId} onOpenChange={() => setEditAccountId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Input placeholder="Account name" value={editAName} onChange={(e) => setEditAName(e.target.value)} />
-            <Select value={editAType} onValueChange={(v) => setEditAType(v as AccountType)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="bank">Bank</SelectItem>
-                <SelectItem value="cash">Cash</SelectItem>
-                <SelectItem value="e-wallet">E-Wallet</SelectItem>
-              </SelectContent>
-            </Select>
-            <Input placeholder="Balance" type="number" value={editABal} onChange={(e) => setEditABal(e.target.value)} />
-            <Button className="w-full" onClick={handleEditAccount}>Save Changes</Button>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Account name</Label>
+              <Input placeholder="e.g. Main Bank" value={editAName} onChange={(e) => setEditAName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={editAType} onValueChange={(v) => setEditAType(v as AccountType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank">Bank</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Balance</Label>
+              <Input placeholder="0.00" type="number" value={editABal} onChange={(e) => setEditABal(e.target.value)} />
+            </div>
+            <Button className="w-full mt-2" onClick={handleEditAccount}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>

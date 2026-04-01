@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
@@ -110,21 +111,33 @@ export default function BillsPage() {
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>New Bill</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <Input placeholder="Bill name" value={name} onChange={(e) => setName(e.target.value)} />
-              <Input placeholder="Amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
-                <SelectContent>
-                  {BILL_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              <Input placeholder="Due day (1-31)" type="number" min="1" max="31" value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-foreground">Recurring monthly</span>
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Bill name</Label>
+                <Input placeholder="e.g. Netflix" value={name} onChange={(e) => setName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Amount</Label>
+                <Input placeholder="0.00" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Category</Label>
+                <Select value={category} onValueChange={setCategory}>
+                  <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                  <SelectContent>
+                    {BILL_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Due day</Label>
+                <Input placeholder="e.g. 15" type="number" min="1" max="31" value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <Label className="text-foreground">Recurring monthly</Label>
                 <Switch checked={recurring} onCheckedChange={setRecurring} />
               </div>
-              <Button className="w-full" onClick={handleAdd}>Add Bill</Button>
+              <Button className="w-full mt-2" onClick={handleAdd}>Add Bill</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -134,21 +147,33 @@ export default function BillsPage() {
       <Dialog open={!!editId} onOpenChange={() => setEditId(null)}>
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Bill</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <Input placeholder="Bill name" value={editName} onChange={(e) => setEditName(e.target.value)} />
-            <Input placeholder="Amount" type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} />
-            <Select value={editCategory} onValueChange={setEditCategory}>
-              <SelectTrigger><SelectValue placeholder="Category" /></SelectTrigger>
-              <SelectContent>
-                {BILL_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Input placeholder="Due day (1-31)" type="number" min="1" max="31" value={editDueDay} onChange={(e) => setEditDueDay(e.target.value)} />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-foreground">Recurring monthly</span>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Bill name</Label>
+              <Input placeholder="e.g. Netflix" value={editName} onChange={(e) => setEditName(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Amount</Label>
+              <Input placeholder="0.00" type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={editCategory} onValueChange={setEditCategory}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {BILL_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due day</Label>
+              <Input placeholder="e.g. 15" type="number" min="1" max="31" value={editDueDay} onChange={(e) => setEditDueDay(e.target.value)} />
+            </div>
+            <div className="flex items-center justify-between pt-2">
+              <Label className="text-foreground">Recurring monthly</Label>
               <Switch checked={editRecurring} onCheckedChange={setEditRecurring} />
             </div>
-            <Button className="w-full" onClick={handleEdit}>Save Changes</Button>
+            <Button className="w-full mt-2" onClick={handleEdit}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>
