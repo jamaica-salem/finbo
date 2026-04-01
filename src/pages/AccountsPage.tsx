@@ -12,7 +12,7 @@ const CATEGORIES = ['Salary', 'Freelance', 'Rent', 'Food', 'Transport', 'Utiliti
 const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, cash: Wallet, 'e-wallet': Smartphone };
 
 export default function AccountsPage() {
-  const { accounts, transactions, addAccount, updateAccount, deleteAccount, addTransaction, deleteTransaction } = useFinanceStore();
+  const { accounts, transactions, addAccount, updateAccount, deleteAccount, addTransaction, deleteTransaction, currency } = useFinanceStore();
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddTx, setShowAddTx] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
@@ -184,7 +184,7 @@ export default function AccountsPage() {
                   </Button>
                 </div>
               </div>
-              <p className="text-xl font-heading font-bold text-foreground mt-3">${a.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+              <p className="text-xl font-heading font-bold text-foreground mt-3">{currency}{a.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
             </div>
           );
         })}
@@ -215,7 +215,7 @@ export default function AccountsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <p className={cn('text-sm font-semibold', tx.type === 'income' ? 'text-success' : 'text-destructive')}>
-                    {tx.type === 'income' ? '+' : '-'}${tx.amount.toFixed(2)}
+                    {tx.type === 'income' ? '+' : '-'}{currency}{tx.amount.toFixed(2)}
                   </p>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => deleteTransaction(tx.id)}>
                     <Trash2 className="h-3 w-3" />

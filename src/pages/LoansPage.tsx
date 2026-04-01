@@ -5,11 +5,11 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, DollarSign, Pencil } from 'lucide-react';
+import { Plus, Trash2, CreditCard, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function LoansPage() {
-  const { loans, addLoan, updateLoan, deleteLoan, logLoanPayment } = useFinanceStore();
+  const { loans, addLoan, updateLoan, deleteLoan, logLoanPayment, currency } = useFinanceStore();
   const [showAdd, setShowAdd] = useState(false);
   const [payLoanId, setPayLoanId] = useState<string | null>(null);
   const [payAmount, setPayAmount] = useState('');
@@ -94,7 +94,7 @@ export default function LoansPage() {
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => setPayLoanId(l.id)}>
-              <DollarSign className="h-3.5 w-3.5" />
+              <CreditCard className="h-3.5 w-3.5" />
             </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(l.id)}>
               <Pencil className="h-3.5 w-3.5" />
@@ -111,18 +111,18 @@ export default function LoansPage() {
           </div>
           <Progress value={pct} className="h-2.5" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>${l.paidAmount.toLocaleString()} paid</span>
-            <span>${l.totalAmount.toLocaleString()} total</span>
+            <span>{currency}{l.paidAmount.toLocaleString()} paid</span>
+            <span>{currency}{l.totalAmount.toLocaleString()} total</span>
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2 text-xs">
           <div>
             <span className="text-muted-foreground">Remaining</span>
-            <p className="font-medium text-foreground">${remaining.toLocaleString()}</p>
+            <p className="font-medium text-foreground">{currency}{remaining.toLocaleString()}</p>
           </div>
           <div>
             <span className="text-muted-foreground">Monthly</span>
-            <p className="font-medium text-foreground">${l.monthlyPayment.toLocaleString()}</p>
+            <p className="font-medium text-foreground">{currency}{l.monthlyPayment.toLocaleString()}</p>
           </div>
         </div>
       </div>

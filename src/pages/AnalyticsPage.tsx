@@ -13,7 +13,7 @@ const COLORS = [
 ];
 
 export default function AnalyticsPage() {
-  const { transactions } = useFinanceStore();
+  const { transactions, currency } = useFinanceStore();
 
   const thisYear = new Date().getFullYear();
 
@@ -61,7 +61,7 @@ export default function AnalyticsPage() {
                       <Cell key={i} fill={COLORS[i % COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [`$${value}`, '']} />
+                  <Tooltip formatter={(value: number) => [`${currency}${value}`, '']} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-2">
@@ -72,7 +72,7 @@ export default function AnalyticsPage() {
                       <span className="text-muted-foreground">{c.name}</span>
                     </div>
                     <div className="text-right">
-                      <span className="font-medium text-foreground">${c.value}</span>
+                      <span className="font-medium text-foreground">{currency}{c.value}</span>
                       <span className="text-xs text-muted-foreground ml-1">({Math.round((c.value / totalExpenses) * 100)}%)</span>
                     </div>
                   </div>
@@ -94,7 +94,7 @@ export default function AnalyticsPage() {
               <YAxis tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} />
               <Tooltip
                 contentStyle={{ background: 'hsl(0, 0%, 100%)', border: '1px solid hsl(220, 14%, 90%)', borderRadius: '8px', fontSize: '12px' }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                formatter={(value: number) => [`${currency}${value.toLocaleString()}`, '']}
               />
               <Bar dataKey="income" fill="hsl(172, 66%, 40%)" radius={[4, 4, 0, 0]} name="Income" />
               <Bar dataKey="expenses" fill="hsl(0, 72%, 55%)" radius={[4, 4, 0, 0]} name="Expenses" />
@@ -113,7 +113,7 @@ export default function AnalyticsPage() {
             <YAxis tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} />
             <Tooltip
               contentStyle={{ background: 'hsl(0, 0%, 100%)', border: '1px solid hsl(220, 14%, 90%)', borderRadius: '8px', fontSize: '12px' }}
-              formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+              formatter={(value: number) => [`${currency}${value.toLocaleString()}`, '']}
             />
             <Line type="monotone" dataKey="income" stroke="hsl(172, 66%, 40%)" strokeWidth={2} dot={{ r: 3 }} name="Income" />
             <Line type="monotone" dataKey="expenses" stroke="hsl(0, 72%, 55%)" strokeWidth={2} dot={{ r: 3 }} name="Expenses" />

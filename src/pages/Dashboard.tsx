@@ -15,7 +15,7 @@ const CHART_COLORS = [
 ];
 
 export default function Dashboard() {
-  const { accounts, transactions, loans, bills } = useFinanceStore();
+  const { accounts, transactions, loans, bills, currency } = useFinanceStore();
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
@@ -64,26 +64,26 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Balance"
-          value={`$${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={`${currency}${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
           trend={{ value: '3.2% vs last month', positive: true }}
           icon={<DollarSign className="h-5 w-5" />}
         />
         <StatCard
           title="Monthly Bills"
-          value={`$${totalBillsDue.toFixed(2)}`}
+          value={`${currency}${totalBillsDue.toFixed(2)}`}
           subtitle={`${paidBills}/${bills.length} paid`}
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
           title="Active Loans"
           value={String(activeLoans.length)}
-          subtitle={`$${totalLoanRemaining.toLocaleString()} remaining`}
+          subtitle={`${currency}${totalLoanRemaining.toLocaleString()} remaining`}
           icon={<CreditCard className="h-5 w-5" />}
         />
         <StatCard
           title="Installments"
           value={String(installments.length)}
-          subtitle={`$${installments.reduce((s, i) => s + (i.totalAmount - i.paidAmount), 0).toLocaleString()} remaining`}
+          subtitle={`${currency}${installments.reduce((s, i) => s + (i.totalAmount - i.paidAmount), 0).toLocaleString()} remaining`}
           icon={<CalendarClock className="h-5 w-5" />}
         />
       </div>
@@ -100,7 +100,7 @@ export default function Dashboard() {
               <YAxis tick={{ fontSize: 12, fill: 'hsl(220, 10%, 46%)' }} />
               <Tooltip
                 contentStyle={{ background: 'hsl(0, 0%, 100%)', border: '1px solid hsl(220, 14%, 90%)', borderRadius: '8px', fontSize: '12px' }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, '']}
+                formatter={(value: number) => [`${currency}${value.toLocaleString()}`, '']}
               />
               <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
                 <Cell fill="hsl(172, 66%, 40%)" />
@@ -122,7 +122,7 @@ export default function Dashboard() {
                       <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [`$${value}`, '']} />
+                  <Tooltip formatter={(value: number) => [`${currency}${value}`, '']} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-2">
@@ -132,7 +132,7 @@ export default function Dashboard() {
                       <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
                       <span className="text-muted-foreground">{c.name}</span>
                     </div>
-                    <span className="font-medium text-foreground">${c.value}</span>
+                    <span className="font-medium text-foreground">{currency}{c.value}</span>
                   </div>
                 ))}
               </div>
@@ -159,7 +159,7 @@ export default function Dashboard() {
                     <p className="text-xs text-muted-foreground">Due: {b.dueDay}th of the month</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-foreground">${b.amount.toFixed(2)}</p>
+                    <p className="text-sm font-semibold text-foreground">{currency}{b.amount.toFixed(2)}</p>
                     <span className={cn(
                       'text-xs font-medium',
                       b.status === 'overdue' ? 'text-destructive' : 'text-warning'
@@ -190,7 +190,7 @@ export default function Dashboard() {
                     </div>
                     <Progress value={pct} className="h-2" />
                     <p className="text-xs text-muted-foreground">
-                      ${l.paidAmount.toLocaleString()} / ${l.totalAmount.toLocaleString()}
+                      {currency}{l.paidAmount.toLocaleString()} / {currency}{l.totalAmount.toLocaleString()}
                     </p>
                   </div>
                 );

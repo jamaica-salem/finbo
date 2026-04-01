@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 const BILL_CATEGORIES = ['Utilities', 'Entertainment', 'Insurance', 'Health', 'Transport', 'Subscription', 'Other'];
 
 export default function BillsPage() {
-  const { bills, addBill, updateBill, deleteBill, markBillPaid, markBillUnpaid } = useFinanceStore();
+  const { bills, addBill, updateBill, deleteBill, markBillPaid, markBillUnpaid, currency } = useFinanceStore();
   const [showAdd, setShowAdd] = useState(false);
 
   const [name, setName] = useState('');
@@ -77,7 +77,7 @@ export default function BillsPage() {
         <p className="text-xs text-muted-foreground">{b.category} · Due: {b.dueDay}th {b.recurring && '· Recurring'}</p>
       </div>
       <div className="flex items-center gap-2">
-        <p className="text-sm font-semibold text-foreground">${b.amount.toFixed(2)}</p>
+        <p className="text-sm font-semibold text-foreground">{currency}{b.amount.toFixed(2)}</p>
         {b.status !== 'paid' ? (
           <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => markBillPaid(b.id)}>
             <Check className="h-3.5 w-3.5" />
