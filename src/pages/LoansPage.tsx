@@ -86,6 +86,19 @@ export default function LoansPage() {
   const renderLoanCard = (l: typeof loans[0]) => {
     const pct = Math.min(100, Math.round((l.paidAmount / l.totalAmount) * 100));
     const remaining = l.totalAmount - l.paidAmount;
+
+    let formattedDue = '-';
+    if (l.dueDate) {
+      const parts = l.dueDate.split('-');
+      if (parts.length === 3) {
+        const [y, m, d] = parts;
+        const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
+        if (!isNaN(dateObj.getTime())) {
+          formattedDue = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(dateObj);
+        }
+      }
+    }
+
     return (
       <div key={l.id} className="glass-card rounded-xl p-5 animate-fade-in">
         <div className="flex items-start justify-between mb-3">
@@ -116,14 +129,18 @@ export default function LoansPage() {
             <span>{currency}{l.totalAmount.toLocaleString()} total</span>
           </div>
         </div>
-        <div className="mt-3 pt-3 border-t border-border grid grid-cols-2 gap-2 text-xs">
+        <div className="mt-3 pt-3 border-t border-border grid grid-cols-3 gap-2 text-xs">
           <div>
             <span className="text-muted-foreground">Remaining</span>
             <p className="font-medium text-foreground">{currency}{remaining.toLocaleString()}</p>
           </div>
-          <div>
+          <div className="text-center">
             <span className="text-muted-foreground">Monthly</span>
             <p className="font-medium text-foreground">{currency}{l.monthlyPayment.toLocaleString()}</p>
+          </div>
+          <div className="text-right">
+            <span className="text-muted-foreground">Due</span>
+            <p className="font-medium text-foreground">{formattedDue}</p>
           </div>
         </div>
       </div>
