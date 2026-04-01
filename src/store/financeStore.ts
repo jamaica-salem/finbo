@@ -46,6 +46,7 @@ interface FinanceState {
   loans: Loan[];
   loanPayments: LoanPayment[];
   bills: Bill[];
+  currency: string;
   
   // Account actions
   addAccount: (account: Omit<Account, 'id'>) => void;
@@ -68,6 +69,9 @@ interface FinanceState {
   deleteBill: (id: string) => void;
   markBillPaid: (id: string) => void;
   markBillUnpaid: (id: string) => void;
+  
+  // Settings actions
+  setCurrency: (currency: string) => void;
 }
 
 export const useFinanceStore = create<FinanceState>((set) => ({
@@ -76,6 +80,7 @@ export const useFinanceStore = create<FinanceState>((set) => ({
   loans: initialLoans,
   loanPayments: [],
   bills: initialBills,
+  currency: '₱',
 
   addAccount: (account) => set((s) => ({ accounts: [...s.accounts, { ...account, id: uid() }] })),
   updateAccount: (id, data) => set((s) => ({ accounts: s.accounts.map((a) => a.id === id ? { ...a, ...data } : a) })),
@@ -121,4 +126,6 @@ export const useFinanceStore = create<FinanceState>((set) => ({
   markBillUnpaid: (id) => set((s) => ({
     bills: s.bills.map((b) => b.id === id ? { ...b, status: 'pending' as const, paidDate: undefined } : b),
   })),
+
+  setCurrency: (currency) => set({ currency }),
 }));

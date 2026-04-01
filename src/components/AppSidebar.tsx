@@ -11,12 +11,16 @@ const navItems = [
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
+import { useFinanceStore } from '@/store/financeStore';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 export function AppSidebar() {
+  const { currency, setCurrency } = useFinanceStore();
   return (
     <aside className="fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col z-30">
       <div className="p-6 flex items-center justify-between">
         <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-          <span className="text-primary">Fin</span>Track
+          <span className="text-primary">Fin</span>bo
         </h1>
         <ThemeToggle />
       </div>
@@ -40,9 +44,26 @@ export function AppSidebar() {
           </RouterNavLink>
         ))}
       </nav>
-      <div className="p-4 mx-3 mb-4 rounded-lg bg-accent/50 border border-border">
-        <p className="text-xs font-medium text-accent-foreground">Pro Tip</p>
-        <p className="text-xs text-muted-foreground mt-1">Track every expense to build better habits.</p>
+      <div className="p-4 mx-3 mb-4 space-y-4">
+        <div className="rounded-lg bg-accent/50 border border-border p-3">
+          <p className="text-xs font-medium text-accent-foreground">Currency</p>
+          <Select value={currency} onValueChange={setCurrency}>
+            <SelectTrigger className="h-8 mt-2 text-xs">
+              <SelectValue placeholder="Select currency" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="₱">PHP (₱)</SelectItem>
+              <SelectItem value="$">USD ($)</SelectItem>
+              <SelectItem value="€">EUR (€)</SelectItem>
+              <SelectItem value="£">GBP (£)</SelectItem>
+              <SelectItem value="¥">JPY (¥)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="rounded-lg bg-accent/50 border border-border p-3">
+          <p className="text-xs font-medium text-accent-foreground">Pro Tip</p>
+          <p className="text-xs text-muted-foreground mt-1">Track every expense to build better habits.</p>
+        </div>
       </div>
     </aside>
   );
