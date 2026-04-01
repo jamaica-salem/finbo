@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { Account, Transaction, Loan, LoanPayment, Bill, BillInstance } from '@/types/finance';
 
 // Generate a simple ID
@@ -74,7 +75,9 @@ interface FinanceState {
   setCurrency: (currency: string) => void;
 }
 
-export const useFinanceStore = create<FinanceState>((set) => ({
+export const useFinanceStore = create<FinanceState>()(
+  persist(
+    (set) => ({
   accounts: initialAccounts,
   transactions: initialTransactions,
   loans: initialLoans,
@@ -128,4 +131,9 @@ export const useFinanceStore = create<FinanceState>((set) => ({
   })),
 
   setCurrency: (currency) => set({ currency }),
-}));
+    }),
+    {
+      name: 'finbo-storage',
+    }
+  )
+);
