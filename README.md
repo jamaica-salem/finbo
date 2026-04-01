@@ -55,14 +55,6 @@ We use Prettier for code formatting. To format your code:
 npm run format
 ```
 
-## Contributing
-
-Contributions are welcome! Please read our [CONTRIBUTING.md](CONTRIBUTING.md) for more information.
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Contact
 
 For questions or support, please open an issue or contact the development team.

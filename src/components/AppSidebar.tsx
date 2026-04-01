@@ -1,7 +1,9 @@
 import { NavLink as RouterNavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3, ChevronLeft, Menu } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
+import { useFinanceStore } from '@/store/financeStore';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -11,17 +13,20 @@ const navItems = [
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
-import { useFinanceStore } from '@/store/financeStore';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-export function AppSidebar() {
+export function AppSidebar({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (val: boolean) => void }) {
   const { currency, setCurrency } = useFinanceStore();
+
+  if (!isOpen) return null;
+
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col z-30">
+    <aside className="fixed left-0 top-0 bottom-0 w-64 bg-card border-r border-border flex flex-col z-30 transition-all duration-300">
       <div className="p-6 flex items-center justify-between">
-        <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
-          <span className="text-primary">Fin</span>bo
-        </h1>
+        <div className="flex items-center gap-2">
+          <img src="/favicon.ico" alt="Finbo Logo" className="w-8 h-8 rounded-sm" />
+          <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+            <span className="text-primary">Fin</span>bo
+          </h1>
+        </div>
         <ThemeToggle />
       </div>
       <nav className="flex-1 px-3 space-y-1">
@@ -63,6 +68,16 @@ export function AppSidebar() {
         <div className="rounded-lg bg-accent/50 border border-border p-3">
           <p className="text-xs font-medium text-accent-foreground">Pro Tip</p>
           <p className="text-xs text-muted-foreground mt-1">Track every expense to build better habits.</p>
+        </div>
+
+        <div className="flex justify-end mt-2">
+          <button
+            onClick={() => setIsOpen(false)}
+            className="p-2 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+            aria-label="Collapse menu"
+          >
+            <ChevronLeft className="w-5 h-5" />
+          </button>
         </div>
       </div>
     </aside>
