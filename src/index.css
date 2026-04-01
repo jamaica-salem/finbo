@@ -1,4 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -57,7 +58,7 @@
     --sidebar-border: 220 14% 90%;
     --sidebar-ring: 172 66% 40%;
 
-    --font-heading: 'Space Grotesk', sans-serif;
+    --font-heading: 'Satoshi', sans-serif;
     --font-body: 'Inter', sans-serif;
   }
 
