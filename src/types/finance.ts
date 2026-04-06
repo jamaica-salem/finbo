@@ -77,7 +77,7 @@ export interface Bill {
   name: string;
   amount: number;
   category: string;
-  dueDay: number;
+  dueDate: string;
   recurring: boolean;
   status: BillStatus;
   paidDate?: string;

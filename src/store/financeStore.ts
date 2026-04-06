@@ -8,11 +8,32 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 const today = new Date();
 const thisMonth = today.getMonth();
 const thisYear = today.getFullYear();
+const currentMonthPrefix = `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}`;
+
+const isIsoDate = (value: unknown): value is string =>
+  typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(new Date(`${value}T00:00:00`).getTime());
+
+const normalizeBill = (bill: Partial<Bill> & { dueDay?: unknown }): Bill => {
+  const dueDay = typeof bill.dueDay === 'number' ? bill.dueDay : Number(bill.dueDay);
+  const fallbackDay = Number.isFinite(dueDay) && dueDay >= 1 && dueDay <= 31 ? dueDay : 1;
+  const fallbackDueDate = `${currentMonthPrefix}-${String(fallbackDay).padStart(2, '0')}`;
+
+  return {
+    id: bill.id ?? uid(),
+    name: bill.name ?? 'Untitled Bill',
+    amount: typeof bill.amount === 'number' ? bill.amount : Number(bill.amount) || 0,
+    category: bill.category ?? 'Other',
+    dueDate: isIsoDate(bill.dueDate) ? bill.dueDate : fallbackDueDate,
+    recurring: typeof bill.recurring === 'boolean' ? bill.recurring : true,
+    status: bill.status === 'paid' || bill.status === 'pending' || bill.status === 'overdue' ? bill.status : 'pending',
+    paidDate: isIsoDate(bill.paidDate) ? bill.paidDate : undefined,
+  };
+};
 
 const initialAccounts: Account[] = [
-  { id: 'acc1', name: 'Main Bank', type: 'bank', balance: 12450.00, currency: 'USD', color: 'hsl(172, 66%, 40%)' },
-  { id: 'acc2', name: 'Cash Wallet', type: 'cash', balance: 340.00, currency: 'USD', color: 'hsl(38, 92%, 50%)' },
-  { id: 'acc3', name: 'PayPal', type: 'e-wallet', balance: 1280.50, currency: 'USD', color: 'hsl(220, 70%, 55%)' },
+  { id: 'acc1', name: 'Main Bank', type: 'bank', balance: 0, currency: 'USD', color: 'hsl(172, 66%, 40%)' },
+  { id: 'acc2', name: 'Cash Wallet', type: 'cash', balance: 0, currency: 'USD', color: 'hsl(38, 92%, 50%)' },
+  { id: 'acc3', name: 'PayPal', type: 'e-wallet', balance: 0, currency: 'USD', color: 'hsl(220, 70%, 55%)' },
 ];
 
 const initialTransactions: Transaction[] = [
@@ -74,12 +95,12 @@ const initialCreditCards: CreditCard[] = [
 const initialCreditCardActivities: CreditCardActivity[] = [];
 
 const initialBills: Bill[] = [
-  { id: 'b1', name: 'Netflix', amount: 15.99, category: 'Entertainment', dueDay: 15, recurring: true, status: 'paid', paidDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15` },
-  { id: 'b2', name: 'Electric Bill', amount: 85, category: 'Utilities', dueDay: 5, recurring: true, status: 'paid' },
-  { id: 'b3', name: 'Internet', amount: 59.99, category: 'Utilities', dueDay: 20, recurring: true, status: 'pending' },
-  { id: 'b4', name: 'Gym Membership', amount: 30, category: 'Health', dueDay: 1, recurring: true, status: 'paid' },
-  { id: 'b5', name: 'Phone Plan', amount: 45, category: 'Utilities', dueDay: 25, recurring: true, status: 'pending' },
-  { id: 'b6', name: 'Insurance', amount: 150, category: 'Insurance', dueDay: 10, recurring: true, status: 'overdue' },
+  { id: 'b1', name: 'Netflix', amount: 15.99, category: 'Entertainment', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15`, recurring: true, status: 'paid', paidDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15` },
+  { id: 'b2', name: 'Electric Bill', amount: 85, category: 'Utilities', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-05`, recurring: true, status: 'paid' },
+  { id: 'b3', name: 'Internet', amount: 59.99, category: 'Utilities', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-20`, recurring: true, status: 'pending' },
+  { id: 'b4', name: 'Gym Membership', amount: 30, category: 'Health', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-01`, recurring: true, status: 'paid' },
+  { id: 'b5', name: 'Phone Plan', amount: 45, category: 'Utilities', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-25`, recurring: true, status: 'pending' },
+  { id: 'b6', name: 'Insurance', amount: 150, category: 'Insurance', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-10`, recurring: true, status: 'overdue' },
 ];
 
 interface FinanceState {
@@ -240,6 +261,28 @@ export const useFinanceStore = create<FinanceState>()(
     }),
     {
       name: 'finbo-storage',
+      version: 1,
+      migrate: (persistedState) => {
+        const state = persistedState as Partial<FinanceState> | undefined;
+        if (!state?.bills) return persistedState;
+
+        return {
+          ...state,
+          bills: state.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
+        };
+      },
+      merge: (persistedState, currentState) => {
+        const typedState = persistedState as Partial<FinanceState> | undefined;
+        if (!typedState?.bills) {
+          return { ...currentState, ...typedState };
+        }
+
+        return {
+          ...currentState,
+          ...typedState,
+          bills: typedState.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
+        };
+      },
     }
   )
 );
