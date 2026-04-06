@@ -41,103 +41,21 @@ const normalizeBill = (bill: Partial<Bill> & { dueDay?: unknown }): Bill => {
   };
 };
 
-const initialAccounts: Account[] = [
-  { id: 'acc1', name: 'Main Bank', type: 'bank', balance: 0, currency: 'USD', color: 'hsl(172, 66%, 40%)' },
-  { id: 'acc2', name: 'Cash Wallet', type: 'cash', balance: 0, currency: 'USD', color: 'hsl(38, 92%, 50%)' },
-  { id: 'acc3', name: 'PayPal', type: 'e-wallet', balance: 0, currency: 'USD', color: 'hsl(220, 70%, 55%)' },
-];
+const initialAccounts: Account[] = [];
 
-const initialTransactions: Transaction[] = [
-  { id: 't1', accountId: 'acc1', type: 'income', amount: 4500, category: 'Salary', description: 'Monthly salary', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-01` },
-  { id: 't2', accountId: 'acc1', type: 'expense', amount: 1200, category: 'Rent', description: 'Monthly rent', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-03` },
-  { id: 't3', accountId: 'acc1', type: 'expense', amount: 85, category: 'Utilities', description: 'Electric bill', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-05` },
-  { id: 't4', accountId: 'acc2', type: 'expense', amount: 45, category: 'Food', description: 'Groceries', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-06` },
-  { id: 't5', accountId: 'acc3', type: 'income', amount: 200, category: 'Freelance', description: 'Design project', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-08` },
-  { id: 't6', accountId: 'acc1', type: 'expense', amount: 120, category: 'Shopping', description: 'Clothing', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-10` },
-  { id: 't7', accountId: 'acc2', type: 'expense', amount: 32, category: 'Transport', description: 'Fuel', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-12` },
-  { id: 't8', accountId: 'acc1', type: 'expense', amount: 65, category: 'Entertainment', description: 'Streaming', date: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-14` },
-];
+const initialTransactions: Transaction[] = [];
 
-const initialLoans: Loan[] = [
-  { id: 'l1', name: 'Car Loan', totalAmount: 0, paidAmount: 0, monthlyPayment: 0, interestRate: 0, startDate: '2023-06-01', dueDate: '2028-06-01', type: 'loan' },
-  { id: 'l2', name: 'MacBook Pro', totalAmount: 0, paidAmount: 0, monthlyPayment: 0, interestRate: 0, startDate: '2024-01-01', dueDate: '2025-01-01', type: 'installment' },
-  { id: 'l3', name: 'Home Renovation', totalAmount: 0, paidAmount: 0, monthlyPayment: 0, interestRate: 0, startDate: '2024-06-01', dueDate: '2027-06-01', type: 'loan' },
-];
+const initialLoans: Loan[] = [];
 
-const initialCreditCards: CreditCard[] = [
-  {
-    id: 'cc1',
-    name: 'Everyday Visa',
-    issuer: 'Finbo Bank',
-    network: 'visa',
-    creditLimit: 0,
-    currentBalance: 0,
-    statementBalance: 0,
-    minimumPayment: 0,
-    apr: 0,
-    rewardsRate: 0,
-    annualFee: 0,
-    dueDate: '2026-04-20',
-    statementCloseDate: '2026-04-15',
-    openedDate: '2023-03-01',
-    autopay: true,
-    rewardsPoints: 0,
-  },
-  {
-    id: 'cc2',
-    name: 'Travel Mastercard',
-    issuer: 'Metro Card',
-    network: 'mastercard',
-    creditLimit: 0,
-    currentBalance: 0,
-    statementBalance: 0,
-    minimumPayment: 0,
-    apr: 0,
-    rewardsRate: 0,
-    annualFee: 0,
-    dueDate: '2026-04-24',
-    statementCloseDate: '2026-04-18',
-    openedDate: '2022-11-12',
-    autopay: false,
-    rewardsPoints: 0,
-  },
-];
+const initialCreditCards: CreditCard[] = [];
 
 const initialCreditCardActivities: CreditCardActivity[] = [];
 
-const initialSavingsGoals: SavingsGoal[] = [
-  {
-    id: 'sg1',
-    name: 'Emergency Fund',
-    category: 'Emergency Fund',
-    targetAmount: 150000,
-    savedAmount: 45000,
-    targetDate: `${thisYear}-12-31`,
-    createdAt: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-01`,
-    note: 'Three months of core expenses',
-  },
-  {
-    id: 'sg2',
-    name: 'Bohol Trip',
-    category: 'Vacation',
-    targetAmount: 60000,
-    savedAmount: 12000,
-    targetDate: `${thisYear + 1}-06-01`,
-    createdAt: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-08`,
-    note: 'Weekend island getaway',
-  },
-];
+const initialSavingsGoals: SavingsGoal[] = [];
 
 const initialSavingsGoalContributions: SavingsGoalContribution[] = [];
 
-const initialBills: Bill[] = [
-  { id: 'b1', name: 'Netflix', amount: 0, category: 'Entertainment', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15`, recurring: true, status: 'paid', paidDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15` },
-  { id: 'b2', name: 'Electric Bill', amount: 0, category: 'Utilities', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-05`, recurring: true, status: 'paid' },
-  { id: 'b3', name: 'Internet', amount: 0, category: 'Utilities', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-20`, recurring: true, status: 'pending' },
-  { id: 'b4', name: 'Gym Membership', amount: 0, category: 'Health', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-01`, recurring: true, status: 'paid' },
-  { id: 'b5', name: 'Phone Plan', amount: 0, category: 'Utilities', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-25`, recurring: true, status: 'pending' },
-  { id: 'b6', name: 'Insurance', amount: 0, category: 'Insurance', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-10`, recurring: true, status: 'overdue' },
-];
+const initialBills: Bill[] = [];
 
 interface FinanceState {
   accounts: Account[];
