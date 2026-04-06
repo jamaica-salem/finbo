@@ -37,6 +37,52 @@ const getMonthKey = (value: Date | string) => {
   return Number.isNaN(date.getTime()) ? null : format(date, 'yyyy-MM');
 };
 const normalizeBudgetCategory = (value: string) => value.trim().toLowerCase();
+const splitList = (value?: string | string[]) => {
+  const items = Array.isArray(value) ? value : String(value ?? '').split(/[,\n;]/);
+  return [...new Set(items.map((item) => item.trim()).filter(Boolean))];
+};
+const getTransactionCategories = (transaction: Transaction) => {
+  const categories = splitList(transaction.categories);
+  return categories.length > 0 ? categories : [transaction.category].filter(Boolean);
+};
+const CATEGORY_COLOR_PALETTE = [
+  '#22c55e',
+  '#0ea5e9',
+  '#f59e0b',
+  '#a855f7',
+  '#ef4444',
+  '#14b8a6',
+  '#f97316',
+  '#ec4899',
+  '#6366f1',
+  '#84cc16',
+];
+const hashCategory = (value: string) => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (hash * 31 + value.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+};
+const ensureCategoryColors = (
+  categories: string[],
+  existingColors: Record<string, string>,
+) => {
+  const nextColors = { ...existingColors };
+  const usedColors = new Set(Object.values(nextColors));
+
+  categories.forEach((category) => {
+    const normalized = category.trim();
+    if (!normalized || nextColors[normalized]) return;
+
+    const availableColor = CATEGORY_COLOR_PALETTE.find((color) => !usedColors.has(color));
+    const color = availableColor ?? CATEGORY_COLOR_PALETTE[hashCategory(normalized) % CATEGORY_COLOR_PALETTE.length];
+    nextColors[normalized] = color;
+    usedColors.add(color);
+  });
+
+  return nextColors;
+};
 
 const nextRecurringDate = (date: Date, frequency: RecurringTransactionFrequency, intervalDays?: number) => {
   switch (frequency) {
@@ -76,6 +122,7 @@ const initialAccounts: Account[] = [];
 const initialTransactions: Transaction[] = [];
 const initialRecurringTransactionRules: RecurringTransactionRule[] = [];
 const initialBudgets: MonthlyBudget[] = [];
+const initialCategoryColors: Record<string, string> = {};
 
 const initialLoans: Loan[] = [];
 
@@ -94,6 +141,7 @@ interface FinanceState {
   transactions: Transaction[];
   recurringTransactionRules: RecurringTransactionRule[];
   budgets: MonthlyBudget[];
+  categoryColors: Record<string, string>;
   loans: Loan[];
   loanPayments: LoanPayment[];
   creditCards: CreditCard[];
@@ -110,6 +158,7 @@ interface FinanceState {
   
   // Transaction actions
   addTransaction: (tx: Omit<Transaction, 'id'>) => void;
+  updateTransaction: (id: string, data: Partial<Transaction>) => void;
   deleteTransaction: (id: string) => void;
   addRecurringTransactionRule: (rule: Omit<RecurringTransactionRule, 'id' | 'createdAt' | 'nextRunDate' | 'lastGeneratedDate'> & { nextRunDate?: string }) => void;
   updateRecurringTransactionRule: (id: string, data: Partial<RecurringTransactionRule>) => void;
@@ -160,6 +209,7 @@ export const useFinanceStore = create<FinanceState>()(
       transactions: initialTransactions,
       recurringTransactionRules: initialRecurringTransactionRules,
       budgets: initialBudgets,
+      categoryColors: initialCategoryColors,
       loans: initialLoans,
       loanPayments: [],
       creditCards: initialCreditCards,
@@ -174,14 +224,77 @@ export const useFinanceStore = create<FinanceState>()(
       deleteAccount: (id) => set((s) => ({ accounts: s.accounts.filter((a) => a.id !== id) })),
 
       addTransaction: (tx) => set((s) => {
-        const newTx = { ...tx, id: uid() };
+        const categories = splitList(tx.categories).length > 0 ? splitList(tx.categories) : [tx.category];
+        const newTx = {
+          ...tx,
+          id: uid(),
+          categories,
+          tags: splitList(tx.tags),
+        };
         const accounts = s.accounts.map((a) => {
           if (a.id === tx.accountId) {
             return { ...a, balance: tx.type === 'income' ? a.balance + tx.amount : a.balance - tx.amount };
           }
           return a;
         });
-        return { transactions: [newTx, ...s.transactions], accounts };
+        return {
+          transactions: [newTx, ...s.transactions],
+          accounts,
+          categoryColors: ensureCategoryColors(categories, s.categoryColors),
+        };
+      }),
+      updateTransaction: (id, data) => set((s) => {
+        const existing = s.transactions.find((tx) => tx.id === id);
+        if (!existing) return s;
+
+        const nextTransaction: Transaction = {
+          ...existing,
+          ...data,
+          category: data.category?.trim() || existing.category,
+          categories: splitList(data.categories ?? existing.categories).length > 0
+            ? splitList(data.categories ?? existing.categories)
+            : [data.category?.trim() || existing.category],
+          tags: splitList(data.tags ?? existing.tags),
+          amount: typeof data.amount === 'number' ? data.amount : existing.amount,
+          accountId: data.accountId || existing.accountId,
+          type: data.type || existing.type,
+          description: data.description ?? existing.description,
+          date: data.date ?? existing.date,
+        };
+
+        const oldAccountId = existing.accountId;
+        const newAccountId = nextTransaction.accountId;
+        const oldEffect = existing.type === 'income' ? existing.amount : -existing.amount;
+        const newEffect = nextTransaction.type === 'income' ? nextTransaction.amount : -nextTransaction.amount;
+
+        const accounts = s.accounts.map((account) => {
+          if (account.id === oldAccountId && account.id === newAccountId) {
+            return {
+              ...account,
+              balance: account.balance - oldEffect + newEffect,
+            };
+          }
+          if (account.id === oldAccountId) {
+            return {
+              ...account,
+              balance: account.balance - oldEffect,
+            };
+          }
+          if (account.id === newAccountId) {
+            return {
+              ...account,
+              balance: account.balance + newEffect,
+            };
+          }
+          return account;
+        });
+        const categories = nextTransaction.categories ?? [nextTransaction.category];
+
+        return {
+          transactions: s.transactions.map((tx) => (tx.id === id ? nextTransaction : tx)),
+          accounts,
+          categoryColors: ensureCategoryColors(categories, s.categoryColors),
+        };
       }),
       deleteTransaction: (id) => set((s) => {
         const tx = s.transactions.find((t) => t.id === id);
@@ -221,6 +334,7 @@ export const useFinanceStore = create<FinanceState>()(
 
         const transactions = [...s.transactions];
         const accounts = [...s.accounts];
+        let categoryColors = { ...s.categoryColors };
         const nextRules = s.recurringTransactionRules.map((rule) => {
           if (!rule.active) return rule;
 
@@ -243,6 +357,8 @@ export const useFinanceStore = create<FinanceState>()(
                   type: rule.type,
                   amount: rule.amount,
                   category: rule.category,
+                  categories: [rule.category],
+                  tags: [],
                   description: rule.description,
                   date: scheduledDate,
                   recurringRuleId: rule.id,
@@ -258,6 +374,7 @@ export const useFinanceStore = create<FinanceState>()(
                     };
                   }
                 });
+                categoryColors = ensureCategoryColors([rule.category], categoryColors);
               }
             }
 
@@ -276,6 +393,7 @@ export const useFinanceStore = create<FinanceState>()(
           transactions,
           accounts,
           recurringTransactionRules: nextRules,
+          categoryColors,
         };
       }),
 
@@ -331,8 +449,10 @@ export const useFinanceStore = create<FinanceState>()(
             if (transaction.type !== 'expense') return;
             const transactionMonthKey = getMonthKey(transaction.date);
             if (transactionMonthKey !== currentMonthKey) return;
-            const key = normalizeBudgetCategory(transaction.category);
-            expenseTotals.set(key, (expenseTotals.get(key) ?? 0) + transaction.amount);
+            getTransactionCategories(transaction).forEach((category) => {
+              const key = normalizeBudgetCategory(category);
+              expenseTotals.set(key, (expenseTotals.get(key) ?? 0) + transaction.amount);
+            });
           });
 
           const nextBudgets = s.budgets.map((budget) => {
@@ -516,6 +636,7 @@ export const useFinanceStore = create<FinanceState>()(
         transactions: data.transactions,
         recurringTransactionRules: (data as FinanceDataState & { recurringTransactionRules?: RecurringTransactionRule[] }).recurringTransactionRules ?? [],
         budgets: (data as FinanceDataState & { budgets?: MonthlyBudget[] }).budgets ?? [],
+        categoryColors: (data as FinanceDataState & { categoryColors?: Record<string, string> }).categoryColors ?? {},
         loans: data.loans,
         loanPayments: data.loanPayments,
         creditCards: data.creditCards,
@@ -537,6 +658,7 @@ export const useFinanceStore = create<FinanceState>()(
           ...state,
           recurringTransactionRules: state.recurringTransactionRules ?? [],
           budgets: state.budgets ?? [],
+          categoryColors: state.categoryColors ?? {},
           bills: state.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
         };
       },
@@ -551,6 +673,7 @@ export const useFinanceStore = create<FinanceState>()(
           ...typedState,
           recurringTransactionRules: typedState.recurringTransactionRules ?? currentState.recurringTransactionRules,
           budgets: typedState.budgets ?? currentState.budgets,
+          categoryColors: typedState.categoryColors ?? currentState.categoryColors,
           bills: typedState.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
         };
       },

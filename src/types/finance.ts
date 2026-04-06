@@ -15,8 +15,10 @@ export interface Transaction {
   type: 'income' | 'expense';
   amount: number;
   category: string;
+  categories?: string[];
   description: string;
   date: string;
+  tags?: string[];
   recurringRuleId?: string;
   scheduledDate?: string;
 }
@@ -167,6 +169,7 @@ export interface FinanceDataState {
   transactions: Transaction[];
   recurringTransactionRules: RecurringTransactionRule[];
   budgets: MonthlyBudget[];
+  categoryColors: Record<string, string>;
   loans: Loan[];
   loanPayments: LoanPayment[];
   creditCards: CreditCard[];
