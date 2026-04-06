@@ -1,6 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Account, Transaction, Loan, LoanPayment, Bill, BillInstance, CreditCard, CreditCardActivity } from '@/types/finance';
+import type {
+  Account,
+  Transaction,
+  Loan,
+  LoanPayment,
+  Bill,
+  BillInstance,
+  CreditCard,
+  CreditCardActivity,
+  SavingsGoal,
+  SavingsGoalContribution,
+} from '@/types/finance';
 
 // Generate a simple ID
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -94,6 +105,31 @@ const initialCreditCards: CreditCard[] = [
 
 const initialCreditCardActivities: CreditCardActivity[] = [];
 
+const initialSavingsGoals: SavingsGoal[] = [
+  {
+    id: 'sg1',
+    name: 'Emergency Fund',
+    category: 'Emergency Fund',
+    targetAmount: 150000,
+    savedAmount: 45000,
+    targetDate: `${thisYear}-12-31`,
+    createdAt: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-01`,
+    note: 'Three months of core expenses',
+  },
+  {
+    id: 'sg2',
+    name: 'Bohol Trip',
+    category: 'Vacation',
+    targetAmount: 60000,
+    savedAmount: 12000,
+    targetDate: `${thisYear + 1}-06-01`,
+    createdAt: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-08`,
+    note: 'Weekend island getaway',
+  },
+];
+
+const initialSavingsGoalContributions: SavingsGoalContribution[] = [];
+
 const initialBills: Bill[] = [
   { id: 'b1', name: 'Netflix', amount: 0, category: 'Entertainment', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15`, recurring: true, status: 'paid', paidDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15` },
   { id: 'b2', name: 'Electric Bill', amount: 0, category: 'Utilities', dueDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-05`, recurring: true, status: 'paid' },
@@ -111,6 +147,8 @@ interface FinanceState {
   creditCards: CreditCard[];
   creditCardActivities: CreditCardActivity[];
   bills: Bill[];
+  savingsGoals: SavingsGoal[];
+  savingsGoalContributions: SavingsGoalContribution[];
   currency: string;
   
   // Account actions
@@ -141,6 +179,12 @@ interface FinanceState {
   deleteBill: (id: string) => void;
   markBillPaid: (id: string) => void;
   markBillUnpaid: (id: string) => void;
+
+  // Savings goal actions
+  addSavingsGoal: (goal: Omit<SavingsGoal, 'id' | 'createdAt' | 'savedAmount'> & { savedAmount?: number }) => void;
+  updateSavingsGoal: (id: string, data: Partial<SavingsGoal>) => void;
+  deleteSavingsGoal: (id: string) => void;
+  addSavingsContribution: (goalId: string, amount: number, note?: string) => void;
   
   // Settings actions
   setCurrency: (currency: string) => void;
@@ -156,6 +200,8 @@ export const useFinanceStore = create<FinanceState>()(
   creditCards: initialCreditCards,
   creditCardActivities: initialCreditCardActivities,
   bills: initialBills,
+  savingsGoals: initialSavingsGoals,
+  savingsGoalContributions: initialSavingsGoalContributions,
   currency: '₱',
 
   addAccount: (account) => set((s) => ({ accounts: [...s.accounts, { ...account, id: uid() }] })),
@@ -256,6 +302,52 @@ export const useFinanceStore = create<FinanceState>()(
   markBillUnpaid: (id) => set((s) => ({
     bills: s.bills.map((b) => b.id === id ? { ...b, status: 'pending' as const, paidDate: undefined } : b),
   })),
+
+  addSavingsGoal: (goal) => set((s) => ({
+    savingsGoals: [
+      ...s.savingsGoals,
+      {
+        ...goal,
+        id: uid(),
+        createdAt: new Date().toISOString().split('T')[0],
+        savedAmount: goal.savedAmount ?? 0,
+      },
+    ],
+  })),
+  updateSavingsGoal: (id, data) => set((s) => ({
+    savingsGoals: s.savingsGoals.map((goal) => (goal.id === id ? { ...goal, ...data } : goal)),
+  })),
+  deleteSavingsGoal: (id) => set((s) => ({
+    savingsGoals: s.savingsGoals.filter((goal) => goal.id !== id),
+    savingsGoalContributions: s.savingsGoalContributions.filter((contribution) => contribution.goalId !== id),
+  })),
+  addSavingsContribution: (goalId, amount, note) => set((s) => {
+    const contributionAmount = Math.max(0, amount);
+    const date = new Date().toISOString().split('T')[0];
+    const contribution: SavingsGoalContribution = {
+      id: uid(),
+      goalId,
+      amount: contributionAmount,
+      date,
+      note,
+    };
+
+    const savingsGoals = s.savingsGoals.map((goal) => {
+      if (goal.id !== goalId) return goal;
+      const savedAmount = goal.savedAmount + contributionAmount;
+      const completedAt = savedAmount >= goal.targetAmount && !goal.completedAt ? date : goal.completedAt;
+      return {
+        ...goal,
+        savedAmount,
+        completedAt,
+      };
+    });
+
+    return {
+      savingsGoals,
+      savingsGoalContributions: [contribution, ...s.savingsGoalContributions],
+    };
+  }),
 
   setCurrency: (currency) => set({ currency }),
     }),
