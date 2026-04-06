@@ -390,7 +390,7 @@ export default function AnalyticsPage() {
                           </div>
                           <div className="h-2 rounded-full bg-muted">
                             <div
-                              className="h-2 rounded-full bg-primary/80"
+                              className="h-2 rounded-full bg-destructive/80"
                               style={{ width: `${Math.max(6, Math.round((day.value / totalExpenses) * 100))}%` }}
                             />
                           </div>

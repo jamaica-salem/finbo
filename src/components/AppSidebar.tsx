@@ -1,5 +1,5 @@
 import { NavLink as RouterNavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3, ChevronLeft, ChevronRight, CreditCard, PiggyBank, Shield } from 'lucide-react';
+import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3, ChevronLeft, ChevronRight, CreditCard, PiggyBank, Shield, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { useFinanceStore } from '@/store/financeStore';
@@ -11,6 +11,7 @@ const navItems = [
   { to: '/loans', label: 'Loans', icon: TrendingDown },
   { to: '/credits', label: 'Credits', icon: CreditCard },
   { to: '/savings', label: 'Savings', icon: PiggyBank },
+  { to: '/budget', label: 'Budget', icon: Target },
   { to: '/bills', label: 'Bills', icon: Receipt },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];

@@ -17,6 +17,52 @@ export interface Transaction {
   category: string;
   description: string;
   date: string;
+  recurringRuleId?: string;
+  scheduledDate?: string;
+}
+
+export type RecurringTransactionFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+
+export interface RecurringTransactionRule {
+  id: string;
+  label: string;
+  accountId: string;
+  type: 'income' | 'expense';
+  amount: number;
+  category: string;
+  description: string;
+  frequency: RecurringTransactionFrequency;
+  intervalDays?: number;
+  startDate: string;
+  nextRunDate: string;
+  endDate?: string;
+  active: boolean;
+  createdAt: string;
+  lastGeneratedDate?: string;
+}
+
+export type BudgetAlertSeverity = 'warning' | 'over';
+
+export interface MonthlyBudget {
+  id: string;
+  category: string;
+  limitAmount: number;
+  alertThresholdPct: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastWarningMonthKey?: string;
+  lastExceededMonthKey?: string;
+}
+
+export interface BudgetAlert {
+  budgetId: string;
+  category: string;
+  severity: BudgetAlertSeverity;
+  spent: number;
+  limitAmount: number;
+  thresholdPct: number;
+  monthKey: string;
 }
 
 export interface Loan {
@@ -119,6 +165,8 @@ export interface SavingsGoalContribution {
 export interface FinanceDataState {
   accounts: Account[];
   transactions: Transaction[];
+  recurringTransactionRules: RecurringTransactionRule[];
+  budgets: MonthlyBudget[];
   loans: Loan[];
   loanPayments: LoanPayment[];
   creditCards: CreditCard[];

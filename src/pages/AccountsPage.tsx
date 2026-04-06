@@ -1,21 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2, ArrowUpRight, ArrowDownRight, Wallet, Building2, Smartphone, Pencil } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Plus, Trash2, ArrowUpRight, ArrowDownRight, Wallet, Building2, Smartphone, Pencil, Repeat2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AccountType } from '@/types/finance';
+import type { AccountType, RecurringTransactionFrequency } from '@/types/finance';
 
 const CATEGORIES = ['Salary', 'Freelance', 'Rent', 'Food', 'Transport', 'Utilities', 'Shopping', 'Entertainment', 'Health', 'Other'];
 const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, cash: Wallet, 'e-wallet': Smartphone };
 
 export default function AccountsPage() {
-  const { accounts, transactions, addAccount, updateAccount, deleteAccount, addTransaction, deleteTransaction, currency } = useFinanceStore();
+  const {
+    accounts,
+    transactions,
+    recurringTransactionRules,
+    addAccount,
+    updateAccount,
+    deleteAccount,
+    addTransaction,
+    deleteTransaction,
+    addRecurringTransactionRule,
+    updateRecurringTransactionRule,
+    deleteRecurringTransactionRule,
+    currency,
+  } = useFinanceStore();
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddTx, setShowAddTx] = useState(false);
+  const [showRecurring, setShowRecurring] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
 
   // Edit account
@@ -36,6 +52,31 @@ export default function AccountsPage() {
   const [txCategory, setTxCategory] = useState('');
   const [txDesc, setTxDesc] = useState('');
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Recurring transaction rule
+  const [ruleLabel, setRuleLabel] = useState('');
+  const [ruleAccountId, setRuleAccountId] = useState(accounts[0]?.id ?? '');
+  const [ruleType, setRuleType] = useState<'income' | 'expense'>('expense');
+  const [ruleAmount, setRuleAmount] = useState('0');
+  const [ruleCategory, setRuleCategory] = useState('');
+  const [ruleDescription, setRuleDescription] = useState('');
+  const [ruleFrequency, setRuleFrequency] = useState<RecurringTransactionFrequency>('monthly');
+  const [ruleIntervalDays, setRuleIntervalDays] = useState('30');
+  const [ruleStartDate, setRuleStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [ruleNextRunDate, setRuleNextRunDate] = useState(new Date().toISOString().split('T')[0]);
+  const [ruleEndDate, setRuleEndDate] = useState('');
+  const [ruleActive, setRuleActive] = useState(true);
+
+  useEffect(() => {
+    if (!accounts.length) {
+      setRuleAccountId('');
+      return;
+    }
+
+    if (!accounts.some((account) => account.id === ruleAccountId)) {
+      setRuleAccountId(accounts[0].id);
+    }
+  }, [accounts, ruleAccountId]);
 
   const handleAddAccount = () => {
     if (!aName) return;
@@ -64,6 +105,38 @@ export default function AccountsPage() {
     setTxAmount(''); setTxDesc(''); setShowAddTx(false);
   };
 
+  const handleAddRecurringRule = () => {
+    if (!ruleLabel.trim() || !ruleAccountId || !ruleAmount || !ruleCategory) return;
+
+    addRecurringTransactionRule({
+      label: ruleLabel.trim(),
+      accountId: ruleAccountId,
+      type: ruleType,
+      amount: parseFloat(ruleAmount) || 0,
+      category: ruleCategory,
+      description: ruleDescription.trim(),
+      frequency: ruleFrequency,
+      intervalDays: ruleFrequency === 'custom' ? Math.max(1, parseInt(ruleIntervalDays, 10) || 1) : undefined,
+      startDate: ruleStartDate,
+      nextRunDate: ruleNextRunDate || ruleStartDate,
+      endDate: ruleEndDate || undefined,
+      active: ruleActive,
+    });
+
+    setRuleLabel('');
+    setRuleType('expense');
+    setRuleAmount('0');
+    setRuleCategory('');
+    setRuleDescription('');
+    setRuleFrequency('monthly');
+    setRuleIntervalDays('30');
+    setRuleStartDate(new Date().toISOString().split('T')[0]);
+    setRuleNextRunDate(new Date().toISOString().split('T')[0]);
+    setRuleEndDate('');
+    setRuleActive(true);
+    setShowRecurring(false);
+  };
+
   const filteredTx = selectedAccount
     ? transactions.filter((t) => t.accountId === selectedAccount)
     : transactions;
@@ -76,6 +149,103 @@ export default function AccountsPage() {
           <p className="text-sm text-muted-foreground mt-1">Manage your accounts and transactions</p>
         </div>
         <div className="flex gap-2">
+          <Dialog open={showRecurring} onOpenChange={setShowRecurring}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm"><Repeat2 className="h-4 w-4 mr-1" />Recurring</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader><DialogTitle>Add Recurring Rule</DialogTitle></DialogHeader>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>Rule label</Label>
+                  <Input placeholder="e.g. Monthly salary" value={ruleLabel} onChange={(e) => setRuleLabel(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Account</Label>
+                  <Select value={ruleAccountId} onValueChange={setRuleAccountId} disabled={!accounts.length}>
+                    <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                    <SelectContent>
+                      {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Type</Label>
+                  <Select value={ruleType} onValueChange={(v) => setRuleType(v as 'income' | 'expense')}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="income">Income</SelectItem>
+                      <SelectItem value="expense">Expense</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Amount</Label>
+                  <Input type="number" min="0" step="0.01" value={ruleAmount} onChange={(e) => setRuleAmount(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Category</Label>
+                  <Select value={ruleCategory} onValueChange={setRuleCategory}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <Label>Description</Label>
+                  <Input placeholder="e.g. Monthly payroll" value={ruleDescription} onChange={(e) => setRuleDescription(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Frequency</Label>
+                  <Select value={ruleFrequency} onValueChange={(v) => setRuleFrequency(v as RecurringTransactionFrequency)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Next run date</Label>
+                  <Input type="date" value={ruleNextRunDate} onChange={(e) => setRuleNextRunDate(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Start date</Label>
+                  <Input type="date" value={ruleStartDate} onChange={(e) => setRuleStartDate(e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>End date</Label>
+                  <Input type="date" value={ruleEndDate} onChange={(e) => setRuleEndDate(e.target.value)} />
+                </div>
+                {ruleFrequency === 'custom' && (
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label>Custom interval in days</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={ruleIntervalDays}
+                      onChange={(e) => setRuleIntervalDays(e.target.value)}
+                    />
+                  </div>
+                )}
+                <div className="flex items-center justify-between rounded-xl border border-border/70 px-3 py-2 md:col-span-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Active</p>
+                    <p className="text-xs text-muted-foreground">Run automatically on due dates</p>
+                  </div>
+                  <Switch checked={ruleActive} onCheckedChange={setRuleActive} />
+                </div>
+                <Button className="md:col-span-2" onClick={handleAddRecurringRule} disabled={!accounts.length}>
+                  Save recurring rule
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
           <Dialog open={showAddAccount} onOpenChange={setShowAddAccount}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />Account</Button>
@@ -189,6 +359,62 @@ export default function AccountsPage() {
         </DialogContent>
       </Dialog>
 
+      <div className="glass-card rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-heading font-semibold text-foreground">Recurring automation</h3>
+            <p className="text-sm text-muted-foreground mt-1">Transactions that the scheduler creates automatically on due dates.</p>
+          </div>
+          <Badge variant="secondary">{recurringTransactionRules.length} rules</Badge>
+        </div>
+
+        {recurringTransactionRules.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recurring rules yet. Add one to automate income or expenses.</p>
+        ) : (
+          <div className="space-y-3">
+            {recurringTransactionRules
+              .slice()
+              .sort((a, b) => a.nextRunDate.localeCompare(b.nextRunDate))
+              .map((rule) => (
+                <div key={rule.id} className="rounded-xl border border-border/70 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-foreground">{rule.label}</p>
+                        <Badge variant={rule.active ? 'default' : 'secondary'}>{rule.active ? 'Active' : 'Paused'}</Badge>
+                        <Badge variant="outline" className="capitalize">{rule.type}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {rule.category} · {rule.description || 'No description'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Next run: {rule.nextRunDate} · {rule.frequency}{rule.frequency === 'custom' && rule.intervalDays ? ` every ${rule.intervalDays} days` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
+                        <span className="text-xs text-muted-foreground">Enabled</span>
+                        <Switch
+                          checked={rule.active}
+                          onCheckedChange={(checked) => updateRecurringTransactionRule(rule.id, { active: checked })}
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        onClick={() => deleteRecurringTransactionRule(rule.id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
+
       {/* Account Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {accounts.map((a) => {
@@ -251,6 +477,7 @@ export default function AccountsPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {tx.recurringRuleId ? <Badge variant="secondary">Recurring</Badge> : null}
                   <p className={cn('text-sm font-semibold', tx.type === 'income' ? 'text-success' : 'text-destructive')}>
                     {tx.type === 'income' ? '+' : '-'}{currency}{tx.amount.toFixed(2)}
                   </p>
