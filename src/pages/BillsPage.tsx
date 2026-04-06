@@ -15,6 +15,11 @@ const formatDueDate = (value: string) => {
   if (Number.isNaN(date.getTime())) return 'No due date';
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 };
+const formatMonthLabel = (value: string) => {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 'No due date';
+  return new Intl.DateTimeFormat('en-US', { month: 'long' }).format(date);
+};
 
 export default function BillsPage() {
   const { bills, addBill, updateBill, deleteBill, markBillPaid, markBillUnpaid, currency } = useFinanceStore();
@@ -69,11 +74,19 @@ export default function BillsPage() {
     return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
   };
   const isOverdue = (bill: typeof bills[0]) => bill.status === 'overdue' || (bill.status === 'pending' && getDueTime(bill.dueDate) < today.getTime());
-  const sortByDueDate = (a: typeof bills[0], b: typeof bills[0]) => getDueTime(a.dueDate) - getDueTime(b.dueDate);
-
-  const overdue = bills.filter(isOverdue).sort(sortByDueDate);
-  const pending = bills.filter((b) => b.status === 'pending' && !isOverdue(b)).sort(sortByDueDate);
-  const paid = bills.filter((b) => b.status === 'paid').sort(sortByDueDate);
+  const sortedBills = [...bills].sort((a, b) => getDueTime(a.dueDate) - getDueTime(b.dueDate));
+  const billsByMonth = sortedBills.reduce<Record<string, typeof bills>>((groups, bill) => {
+    const date = new Date(`${bill.dueDate}T00:00:00`);
+    const monthKey = Number.isNaN(date.getTime()) ? 'no-due-date' : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (!groups[monthKey]) groups[monthKey] = [];
+    groups[monthKey].push(bill);
+    return groups;
+  }, {});
+  const monthGroups = Object.entries(billsByMonth).sort(([keyA], [keyB]) => {
+    if (keyA === 'no-due-date') return 1;
+    if (keyB === 'no-due-date') return -1;
+    return keyA.localeCompare(keyB);
+  });
 
   const renderBill = (b: typeof bills[0]) => (
     <div key={b.id} className={cn(
@@ -189,24 +202,20 @@ export default function BillsPage() {
         </DialogContent>
       </Dialog>
 
-      {overdue.length > 0 && (
-        <div>
-          <h2 className="font-heading font-semibold text-destructive mb-3">⚠ Overdue ({overdue.length})</h2>
-          <div className="space-y-2">{overdue.map(renderBill)}</div>
-        </div>
-      )}
+      {monthGroups.length > 0 && (
+        <div className="space-y-6">
+          {monthGroups.map(([monthKey, monthBills]) => {
+            const heading = monthKey === 'no-due-date'
+              ? 'No Due Date'
+              : formatMonthLabel(monthBills[0].dueDate);
 
-      {pending.length > 0 && (
-        <div>
-          <h2 className="font-heading font-semibold text-foreground mb-3">Upcoming ({pending.length})</h2>
-          <div className="space-y-2">{pending.map(renderBill)}</div>
-        </div>
-      )}
-
-      {paid.length > 0 && (
-        <div>
-          <h2 className="font-heading font-semibold text-foreground mb-3">Paid ({paid.length})</h2>
-          <div className="space-y-2">{paid.map(renderBill)}</div>
+            return (
+              <div key={monthKey}>
+                <h2 className="mb-3 font-heading text-lg font-semibold text-foreground">{heading}</h2>
+                <div className="space-y-2">{monthBills.map(renderBill)}</div>
+              </div>
+            );
+          })}
         </div>
       )}
 
