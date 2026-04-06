@@ -17,8 +17,8 @@ const navItems = [
 ];
 
 const settingsItems = [
-  { to: '/security', label: 'Security', icon: Shield },
   { to: '/onboarding', label: 'Onboarding', icon: Sparkles },
+  { to: '/security', label: 'Security', icon: Shield },
   { to: '/support', label: 'Support', icon: Gift },
 ];
 
