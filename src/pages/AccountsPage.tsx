@@ -27,7 +27,7 @@ export default function AccountsPage() {
   // Add account form
   const [aName, setAName] = useState('');
   const [aType, setAType] = useState<AccountType>('bank');
-  const [aBal, setABal] = useState('');
+  const [aBal, setABal] = useState('0');
 
   // Add transaction form
   const [txAccount, setTxAccount] = useState('');
@@ -38,9 +38,9 @@ export default function AccountsPage() {
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleAddAccount = () => {
-    if (!aName || !aBal) return;
-    addAccount({ name: aName, type: aType, balance: parseFloat(aBal), currency: 'USD', color: 'hsl(172, 66%, 40%)' });
-    setAName(''); setABal(''); setShowAddAccount(false);
+    if (!aName) return;
+    addAccount({ name: aName, type: aType, balance: parseFloat(aBal) || 0, currency: 'USD', color: 'hsl(172, 66%, 40%)' });
+    setAName(''); setABal('0'); setShowAddAccount(false);
   };
 
   const openEditAccount = (id: string) => {
