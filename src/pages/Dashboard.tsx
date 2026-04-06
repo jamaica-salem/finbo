@@ -25,14 +25,26 @@ export default function Dashboard() {
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
-  const thisMonth = new Date().getMonth();
-  const thisYear = new Date().getFullYear();
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
   const monthTx = transactions.filter((t) => {
     const d = new Date(t.date);
     return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
   });
   const income = monthTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
   const expenses = monthTx.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
+  const monthNet = income - expenses;
+  const previousBalance = totalBalance - monthNet;
+  const balanceChangePct =
+    previousBalance > 0 ? ((totalBalance - previousBalance) / previousBalance) * 100 : totalBalance > 0 ? 100 : 0;
+  const isPositiveBalanceTrend = monthNet >= 0;
+  const balanceTrendLabel =
+    previousBalance <= 0 && totalBalance > 0
+      ? 'New balance this month'
+      : previousBalance === 0
+        ? 'vs last month'
+        : `vs last month`;
 
   const activeLoans = loans.filter((l) => l.paidAmount < l.totalAmount);
   const totalLoanRemaining = activeLoans.reduce((s, l) => s + (l.totalAmount - l.paidAmount), 0);
@@ -41,7 +53,6 @@ export default function Dashboard() {
   const totalBillsDue = bills.filter((b) => b.status !== 'paid').reduce((s, b) => s + b.amount, 0);
   const paidBills = bills.filter((b) => b.status === 'paid').length;
 
-  const now = new Date();
   const getDueTime = (value: string) => {
     const time = new Date(`${value}T00:00:00`).getTime();
     return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
@@ -75,7 +86,13 @@ export default function Dashboard() {
         <StatCard
           title="Total Balance"
           value={`${currency}${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          trend={{ value: '3.2% vs last month', positive: true }}
+          trend={{
+            value:
+              previousBalance === 0 && totalBalance === 0
+                ? 'No balance change yet'
+                : `${Math.abs(balanceChangePct).toFixed(1)}% ${balanceTrendLabel}`,
+            positive: isPositiveBalanceTrend,
+          }}
           icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
