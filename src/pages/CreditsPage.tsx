@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
-import { Plus, Trash2, CreditCard, Pencil, ArrowDownLeft, ArrowUpRight, BadgeDollarSign, Wallet, Percent, CalendarClock, ReceiptText } from 'lucide-react';
+import { Plus, Trash2, CreditCard, Pencil, ArrowDownLeft, ArrowUpRight, PhilippinePeso, Wallet, Percent, CalendarClock, ReceiptText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { type CreditCard as CreditCardType } from '@/types/finance';
 
@@ -259,7 +259,7 @@ export default function CreditsPage() {
           </div>
           <div className="rounded-lg border border-border bg-background/40 p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground">
-              <BadgeDollarSign className="h-3.5 w-3.5" />
+              <PhilippinePeso className="h-3.5 w-3.5" />
               <span>Minimum due</span>
             </div>
             <p className="mt-1 font-medium text-foreground">{formatCurrency(currency, card.minimumPayment)}</p>
@@ -410,7 +410,7 @@ export default function CreditsPage() {
           title="Minimum Due"
           value={formatCurrency(currency, totalMinimumDue)}
           subtitle="Across all cards"
-          icon={<BadgeDollarSign className="h-5 w-5" />}
+          icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
           title="Rewards Points"
