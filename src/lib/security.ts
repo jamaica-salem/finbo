@@ -1,4 +1,4 @@
-const FINBO_STORAGE_KEYS = ['finbo-storage', 'finbo-security'];
+const FINBO_STORAGE_KEYS = ['finbo-storage', 'finbo-security', 'finbo-onboarding'];
 
 const textEncoder = new TextEncoder();
 
