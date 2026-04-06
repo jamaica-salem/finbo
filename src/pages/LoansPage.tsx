@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useFinanceStore } from '@/store/financeStore';
+import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Trash2, CreditCard, Pencil } from 'lucide-react';
+import { Plus, Trash2, CreditCard, Pencil, PhilippinePeso, TrendingDown, CalendarClock, Percent } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function LoansPage() {
@@ -82,6 +83,10 @@ export default function LoansPage() {
 
   const activeLoans = loans.filter((l) => l.type === 'loan');
   const installments = loans.filter((l) => l.type === 'installment');
+  const totalOutstanding = loans.reduce((sum, loan) => sum + Math.max(0, loan.totalAmount - loan.paidAmount), 0);
+  const totalMonthly = loans.reduce((sum, loan) => sum + loan.monthlyPayment, 0);
+  const averageInterest = loans.length > 0 ? loans.reduce((sum, loan) => sum + loan.interestRate, 0) / loans.length : 0;
+  const totalLoanCount = loans.length;
 
   const renderLoanCard = (l: typeof loans[0]) => {
     const pct = Math.min(100, Math.round((l.paidAmount / l.totalAmount) * 100));
@@ -199,6 +204,33 @@ export default function LoansPage() {
             </div>
           </DialogContent>
         </Dialog>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Total Loans"
+          value={String(totalLoanCount)}
+          subtitle={`${activeLoans.length} active, ${installments.length} installment${installments.length === 1 ? '' : 's'}`}
+          icon={<TrendingDown className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Outstanding Balance"
+          value={`${currency}${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Across all loans"
+          icon={<PhilippinePeso className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Monthly Commitments"
+          value={`${currency}${totalMonthly.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Planned monthly payments"
+          icon={<CalendarClock className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Average APR"
+          value={`${averageInterest.toFixed(1)}%`}
+          subtitle="Across all loans"
+          icon={<Percent className="h-5 w-5" />}
+        />
       </div>
 
       {/* Payment Dialog */}
