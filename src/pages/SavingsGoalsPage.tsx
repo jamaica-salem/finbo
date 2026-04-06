@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Plus, Target, Sparkles, Gift, Pencil, Trash2, CircleDollarSign, CalendarDays, Trophy } from 'lucide-react';
+import { Plus, Target, Sparkles, Gift, Pencil, Trash2, PhilippinePeso, CalendarDays, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SavingsGoalCategory } from '@/types/finance';
 
@@ -158,7 +158,7 @@ export default function SavingsGoalsPage() {
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setContributeGoalId(goal.id)}>
-              <CircleDollarSign className="h-4 w-4" />
+              <PhilippinePeso className="h-4 w-4" />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openEdit(goal.id)}>
               <Pencil className="h-4 w-4" />
@@ -259,7 +259,7 @@ export default function SavingsGoalsPage() {
           title="Total Saved"
           value={formatMoney(currency, totalSaved)}
           subtitle={`${savingsGoals.length} goal${savingsGoals.length === 1 ? '' : 's'}`}
-          icon={<CircleDollarSign className="h-5 w-5" />}
+          icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
           title="Total Target"
