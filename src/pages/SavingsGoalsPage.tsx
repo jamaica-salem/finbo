@@ -9,8 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { PageHeader } from '@/components/PageHeader';
 import { Plus, Target, Sparkles, Gift, Pencil, Trash2, PhilippinePeso, CalendarDays, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { SavingsGoalCategory } from '@/types/finance';
 
 const GOAL_CATEGORIES: SavingsGoalCategory[] = ['Vacation', 'Emergency Fund', 'Home', 'Education', 'Tech', 'Other'];
@@ -54,6 +56,7 @@ export default function SavingsGoalsPage() {
   const [editTargetAmount, setEditTargetAmount] = useState('0');
   const [editTargetDate, setEditTargetDate] = useState('');
   const [editNote, setEditNote] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
 
   const totalTarget = savingsGoals.reduce((sum, goal) => sum + goal.targetAmount, 0);
   const totalSaved = savingsGoals.reduce((sum, goal) => sum + goal.savedAmount, 0);
@@ -132,6 +135,18 @@ export default function SavingsGoalsPage() {
     setContributeGoalId(null);
   };
 
+  const handleDeleteGoal = (goalId: string) => {
+    const goal = savingsGoals.find((item) => item.id === goalId);
+    if (!goal) return;
+    setPendingDelete({ id: goalId, label: goal.name });
+  };
+
+  const confirmDeleteGoal = () => {
+    if (!pendingDelete) return;
+    deleteSavingsGoal(pendingDelete.id);
+    setPendingDelete(null);
+  };
+
   const renderGoal = (goal: (typeof savingsGoals)[0]) => {
     const pct = goal.targetAmount > 0 ? Math.min(100, Math.round((goal.savedAmount / goal.targetAmount) * 100)) : 0;
     const remaining = Math.max(0, goal.targetAmount - goal.savedAmount);
@@ -163,7 +178,7 @@ export default function SavingsGoalsPage() {
             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => openEdit(goal.id)}>
               <Pencil className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => deleteSavingsGoal(goal.id)}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => handleDeleteGoal(goal.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
           </div>
@@ -200,11 +215,10 @@ export default function SavingsGoalsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Savings Goals</h1>
-          <p className="text-sm text-muted-foreground mt-1">Set targets, track progress, and celebrate every win</p>
-        </div>
+      <PageHeader
+        title="Savings Goals"
+        description="Set targets, track progress, and celebrate every win"
+        actions={
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogTrigger asChild>
             <Button size="sm">
@@ -252,7 +266,8 @@ export default function SavingsGoalsPage() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -357,6 +372,17 @@ export default function SavingsGoalsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete savings goal?"
+        description={
+          pendingDelete ? `Are you sure you want to delete savings goal "${pendingDelete.label}"? This action cannot be undone.` : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteGoal}
+      />
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">

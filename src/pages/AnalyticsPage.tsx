@@ -30,18 +30,9 @@ import { useFinanceStore } from '@/store/financeStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatCard } from '@/components/StatCard';
+import { PageHeader } from '@/components/PageHeader';
+import { getCategoryColor } from '@/lib/transactionCategories';
 import { PhilippinePeso } from 'lucide-react';
-
-const COLORS = [
-  'hsl(172, 66%, 40%)',
-  'hsl(220, 70%, 55%)',
-  'hsl(38, 92%, 50%)',
-  'hsl(280, 60%, 55%)',
-  'hsl(0, 72%, 55%)',
-  'hsl(150, 50%, 45%)',
-  'hsl(340, 65%, 55%)',
-  'hsl(60, 70%, 45%)',
-];
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -71,9 +62,11 @@ const startDateForPeriod = (period: PeriodValue) => {
 const asDate = (value: string) => new Date(`${value}T00:00:00`);
 
 const getMerchantLabel = (description: string) => description.trim() || 'Unspecified';
+const getCategories = (transaction: { category: string; categories?: string[] }) =>
+  (transaction.categories && transaction.categories.length > 0 ? transaction.categories : [transaction.category]).filter(Boolean);
 
 export default function AnalyticsPage() {
-  const { transactions, currency } = useFinanceStore();
+  const { transactions, currency, categoryColors } = useFinanceStore();
   const [period, setPeriod] = useState<PeriodValue>('6m');
 
   const now = new Date();
@@ -113,12 +106,14 @@ export default function AnalyticsPage() {
   const categoryData = useMemo(() => {
     const map: Record<string, number> = {};
     expenses.forEach((transaction) => {
-      map[transaction.category] = (map[transaction.category] || 0) + transaction.amount;
+      getCategories(transaction).forEach((category) => {
+        map[category] = (map[category] || 0) + transaction.amount;
+      });
     });
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value], index) => ({ name, value, color: getCategoryColor(name, categoryColors, index) }))
       .sort((a, b) => b.value - a.value);
-  }, [expenses]);
+  }, [categoryColors, expenses]);
 
   const merchantData = useMemo(() => {
     const map: Record<string, number> = {};
@@ -127,10 +122,10 @@ export default function AnalyticsPage() {
       map[merchant] = (map[merchant] || 0) + transaction.amount;
     });
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, value], index) => ({ name, value, color: getCategoryColor(name, categoryColors, index) }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 8);
-  }, [expenses]);
+  }, [categoryColors, expenses]);
 
   const weeklyBreakdown = useMemo(() => {
     const map: Record<string, number> = {};
@@ -184,15 +179,11 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Analytics & Insights</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Personalized spending analysis by category, merchant, and time period.
-          </p>
-        </div>
-
-        <div className="w-full max-w-xs">
+      <PageHeader
+        title="Analytics & Insights"
+        description="Personalized spending analysis by category, merchant, and time period."
+        actions={
+          <div className="w-full max-w-xs">
           <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
             <Filter className="h-3.5 w-3.5" />
             Time period
@@ -209,8 +200,9 @@ export default function AnalyticsPage() {
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </div>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -262,18 +254,18 @@ export default function AnalyticsPage() {
                     <ResponsiveContainer width={180} height={180}>
                       <PieChart>
                         <Pie data={categoryData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                          {categoryData.map((_, index) => (
-                            <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                          {categoryData.map((entry) => (
+                            <Cell key={entry.name} fill={entry.color} />
                           ))}
                         </Pie>
                         <Tooltip formatter={(value: number) => [formatMoney(currency, value), '']} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex-1 space-y-2">
-                      {categoryData.map((entry, index) => (
-                        <div key={entry.name} className="flex items-center justify-between text-sm">
-                          <div className="flex items-center gap-2">
-                            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                    {categoryData.map((entry, index) => (
+                      <div key={entry.name} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
                             <span className="text-muted-foreground">{entry.name}</span>
                           </div>
                           <div className="text-right">
@@ -314,7 +306,7 @@ export default function AnalyticsPage() {
                             className="h-2 rounded-full transition-all"
                             style={{
                               width: `${Math.max(6, Math.round((merchant.value / totalExpenses) * 100))}%`,
-                              backgroundColor: COLORS[index % COLORS.length],
+                              backgroundColor: getCategoryColor(merchant.name, categoryColors, index),
                             }}
                           />
                         </div>

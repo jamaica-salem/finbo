@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { PageHeader } from '@/components/PageHeader';
 import { Plus, Trash2, Check, Undo2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const BILL_CATEGORIES = ['Utilities', 'Entertainment', 'Insurance', 'Health', 'Transport', 'Subscription', 'Other'];
+import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { buildTransactionCategoryOptions } from '@/lib/transactionCategories';
 const formatDueDate = (value: string) => {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return 'No due date';
@@ -22,7 +23,7 @@ const formatMonthLabel = (value: string) => {
 };
 
 export default function BillsPage() {
-  const { bills, addBill, updateBill, deleteBill, markBillPaid, currency } = useFinanceStore();
+  const { bills, addBill, updateBill, deleteBill, markBillPaid, currency, transactions } = useFinanceStore();
   const [showAdd, setShowAdd] = useState(false);
 
   const [name, setName] = useState('');
@@ -38,11 +39,25 @@ export default function BillsPage() {
   const [editCategory, setEditCategory] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editRecurring, setEditRecurring] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
+  const billCategories = useMemo(() => buildTransactionCategoryOptions(transactions), [transactions]);
 
   const handleAdd = () => {
     if (!name || !dueDate) return;
     addBill({ name, amount: parseFloat(amount) || 0, category: category || 'Other', dueDate, recurring, status: 'pending' });
     setName(''); setAmount('0'); setCategory(''); setDueDate(''); setShowAdd(false);
+  };
+
+  const handleDelete = (billId: string) => {
+    const bill = bills.find((item) => item.id === billId);
+    if (!bill) return;
+    setPendingDelete({ id: billId, label: bill.name });
+  };
+
+  const confirmDeleteBill = () => {
+    if (!pendingDelete) return;
+    deleteBill(pendingDelete.id);
+    setPendingDelete(null);
   };
 
   const openEdit = (id: string) => {
@@ -110,7 +125,7 @@ export default function BillsPage() {
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(b.id)}>
           <Pencil className="h-3 w-3" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => deleteBill(b.id)}>
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => handleDelete(b.id)}>
           <Trash2 className="h-3 w-3" />
         </Button>
       </div>
@@ -119,11 +134,10 @@ export default function BillsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Bills & Due Dates</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage recurring and one-time bills</p>
-        </div>
+      <PageHeader
+        title="Bills & Due Dates"
+        description="Manage recurring and one-time bills"
+        actions={
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Bill</Button>
@@ -144,7 +158,7 @@ export default function BillsPage() {
                 <Select value={category} onValueChange={setCategory}>
                   <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                   <SelectContent>
-                    {BILL_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {billCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -160,7 +174,8 @@ export default function BillsPage() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
 
       {/* Edit Bill Dialog */}
       <Dialog open={!!editId} onOpenChange={() => setEditId(null)}>
@@ -180,7 +195,7 @@ export default function BillsPage() {
               <Select value={editCategory} onValueChange={setEditCategory}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {BILL_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {billCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -196,6 +211,17 @@ export default function BillsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete bill?"
+        description={
+          pendingDelete ? `Are you sure you want to delete bill "${pendingDelete.label}"? This action cannot be undone.` : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteBill}
+      />
 
       {monthGroups.length > 0 && (
         <div className="space-y-6">

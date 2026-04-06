@@ -13,22 +13,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
 import { StatCard } from '@/components/StatCard';
+import { PageHeader } from '@/components/PageHeader';
+import { buildTransactionCategoryOptions } from '@/lib/transactionCategories';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { MonthlyBudget } from '@/types/finance';
 import { PhilippinePeso } from 'lucide-react';
-
-const BUDGET_CATEGORY_SUGGESTIONS = [
-  'Food',
-  'Transport',
-  'Utilities',
-  'Shopping',
-  'Entertainment',
-  'Health',
-  'Housing',
-  'Subscriptions',
-  'Education',
-  'Travel',
-  'Other',
-];
 
 const normalizeCategory = (value: string) => value.trim().toLowerCase();
 const asDate = (value: string) => {
@@ -68,10 +57,16 @@ export default function BudgetPage() {
   const [budgetAmount, setBudgetAmount] = useState('0');
   const [budgetThreshold, setBudgetThreshold] = useState('80');
   const [budgetActive, setBudgetActive] = useState(true);
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
 
   const now = new Date();
   const currentMonthKey = format(now, 'yyyy-MM');
   const currentMonthLabel = format(now, 'MMMM yyyy');
+  const categorySuggestions = useMemo(() => {
+    const base = buildTransactionCategoryOptions(transactions);
+    const extras = ['Housing', 'Subscriptions', 'Education', 'Travel'];
+    return Array.from(new Set([...base, ...extras]));
+  }, [transactions]);
 
   const openAddBudget = () => {
     setEditingBudgetId(null);
@@ -103,8 +98,10 @@ export default function BudgetPage() {
       if (transaction.type !== 'expense') return;
       const date = asDate(transaction.date);
       if (!date || format(date, 'yyyy-MM') !== currentMonthKey) return;
-      const key = normalizeCategory(transaction.category);
-      map.set(key, (map.get(key) ?? 0) + transaction.amount);
+      (transaction.categories?.length ? transaction.categories : [transaction.category]).forEach((category) => {
+        const key = normalizeCategory(category);
+        map.set(key, (map.get(key) ?? 0) + transaction.amount);
+      });
     });
 
     return map;
@@ -180,8 +177,16 @@ export default function BudgetPage() {
   };
 
   const handleDeleteBudget = (budgetId: string) => {
-    deleteBudget(budgetId);
+    const budget = budgets.find((item) => item.id === budgetId);
+    if (!budget) return;
+    setPendingDelete({ id: budgetId, label: budget.category });
+  };
+
+  const confirmDeleteBudget = () => {
+    if (!pendingDelete) return;
+    deleteBudget(pendingDelete.id);
     toast.success('Budget deleted.');
+    setPendingDelete(null);
   };
 
   const formatMoney = (value: number) =>
@@ -189,88 +194,85 @@ export default function BudgetPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Budgets</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Monthly budgets and alerts for {currentMonthLabel}.
-          </p>
-        </div>
-
-        <Dialog
-          open={showBudgetDialog}
-          onOpenChange={(open) => {
-            setShowBudgetDialog(open);
-            if (!open) {
-              setEditingBudgetId(null);
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button onClick={openAddBudget}>
-              <Plus className="mr-1 h-4 w-4" />
-              Budget
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>{editingBudgetId ? 'Edit Budget' : 'Add Budget'}</DialogTitle>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Category</Label>
-                <Input
-                  list="budget-category-suggestions"
-                  placeholder="e.g. Food"
-                  value={budgetCategory}
-                  onChange={(event) => setBudgetCategory(event.target.value)}
-                />
-                <datalist id="budget-category-suggestions">
-                  {BUDGET_CATEGORY_SUGGESTIONS.map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Monthly budget amount</Label>
-                <Input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={budgetAmount}
-                  onChange={(event) => setBudgetAmount(event.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Alert threshold (%)</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  max="100"
-                  step="1"
-                  value={budgetThreshold}
-                  onChange={(event) => setBudgetThreshold(event.target.value)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-border/70 px-3 py-2">
-                <div>
-                  <p className="text-sm font-medium text-foreground">Active</p>
-                  <p className="text-xs text-muted-foreground">Receive alerts for this budget</p>
-                </div>
-                <Switch checked={budgetActive} onCheckedChange={setBudgetActive} />
-              </div>
-
-              <Button className="w-full" onClick={handleSaveBudget}>
-                {editingBudgetId ? 'Save changes' : 'Add budget'}
+      <PageHeader
+        title="Budgets"
+        description={`Monthly budgets and alerts for ${currentMonthLabel}.`}
+        actions={
+          <Dialog
+            open={showBudgetDialog}
+            onOpenChange={(open) => {
+              setShowBudgetDialog(open);
+              if (!open) {
+                setEditingBudgetId(null);
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button onClick={openAddBudget}>
+                <Plus className="mr-1 h-4 w-4" />
+                Budget
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>{editingBudgetId ? 'Edit Budget' : 'Add Budget'}</DialogTitle>
+              </DialogHeader>
+
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label>Category</Label>
+                  <Input
+                    list="budget-category-suggestions"
+                    placeholder="e.g. Food"
+                    value={budgetCategory}
+                    onChange={(event) => setBudgetCategory(event.target.value)}
+                  />
+                  <datalist id="budget-category-suggestions">
+                    {categorySuggestions.map((item) => (
+                      <option key={item} value={item} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Monthly budget amount</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={budgetAmount}
+                    onChange={(event) => setBudgetAmount(event.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Alert threshold (%)</Label>
+                  <Input
+                    type="number"
+                    min="1"
+                    max="100"
+                    step="1"
+                    value={budgetThreshold}
+                    onChange={(event) => setBudgetThreshold(event.target.value)}
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-xl border border-border/70 px-3 py-2">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Active</p>
+                    <p className="text-xs text-muted-foreground">Receive alerts for this budget</p>
+                  </div>
+                  <Switch checked={budgetActive} onCheckedChange={setBudgetActive} />
+                </div>
+
+                <Button className="w-full" onClick={handleSaveBudget}>
+                  {editingBudgetId ? 'Save changes' : 'Add budget'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -324,6 +326,19 @@ export default function BudgetPage() {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete budget?"
+        description={
+          pendingDelete
+            ? `Are you sure you want to delete the budget for "${pendingDelete.label}"? This action cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteBudget}
+      />
 
       <Card>
         <CardHeader>

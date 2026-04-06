@@ -1,27 +1,22 @@
 import { useFinanceStore } from '@/store/financeStore';
 import { StatCard } from '@/components/StatCard';
+import { PageHeader } from '@/components/PageHeader';
 import { PhilippinePeso, Receipt, TrendingUp, CreditCard, CalendarClock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
-
-const CHART_COLORS = [
-  'hsl(172, 66%, 40%)',
-  'hsl(220, 70%, 55%)',
-  'hsl(38, 92%, 50%)',
-  'hsl(280, 60%, 55%)',
-  'hsl(0, 72%, 55%)',
-  'hsl(150, 50%, 45%)',
-];
+import { getCategoryColor } from '@/lib/transactionCategories';
 
 const formatDueDate = (value: string) => {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return 'No due date';
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 };
+const getCategories = (transaction: { category: string; categories?: string[] }) =>
+  (transaction.categories && transaction.categories.length > 0 ? transaction.categories : [transaction.category]).filter(Boolean);
 
 export default function Dashboard() {
-  const { accounts, transactions, loans, bills, currency } = useFinanceStore();
+  const { accounts, transactions, loans, bills, currency, categoryColors } = useFinanceStore();
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
@@ -70,16 +65,22 @@ export default function Dashboard() {
   // Spending by category
   const categoryMap: Record<string, number> = {};
   monthTx.filter((t) => t.type === 'expense').forEach((t) => {
-    categoryMap[t.category] = (categoryMap[t.category] || 0) + t.amount;
+    getCategories(t).forEach((category) => {
+      categoryMap[category] = (categoryMap[category] || 0) + t.amount;
+    });
   });
-  const categoryData = Object.entries(categoryMap).map(([name, value]) => ({ name, value }));
+  const categoryData = Object.entries(categoryMap).map(([name, value], index) => ({
+    name,
+    value,
+    color: getCategoryColor(name, categoryColors, index),
+  }));
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-heading font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Your financial overview at a glance</p>
-      </div>
+      <PageHeader
+        title="Dashboard"
+        description="Your financial overview at a glance"
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -145,18 +146,18 @@ export default function Dashboard() {
               <ResponsiveContainer width={160} height={160}>
                 <PieChart>
                   <Pie data={categoryData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={3} dataKey="value">
-                    {categoryData.map((_, i) => (
-                      <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                    {categoryData.map((entry) => (
+                      <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(value: number) => [`${currency}${value}`, '']} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-2">
-                {categoryData.map((c, i) => (
+                {categoryData.map((c) => (
                   <div key={c.name} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
-                      <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: c.color }} />
                       <span className="text-muted-foreground">{c.name}</span>
                     </div>
                     <span className="font-medium text-foreground">{currency}{c.value}</span>

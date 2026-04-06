@@ -7,8 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
+import { PageHeader } from '@/components/PageHeader';
 import { Plus, Trash2, CreditCard, Pencil, PhilippinePeso, TrendingDown, CalendarClock, Percent } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 
 export default function LoansPage() {
   const { loans, addLoan, updateLoan, deleteLoan, logLoanPayment, currency } = useFinanceStore();
@@ -36,6 +38,7 @@ export default function LoansPage() {
   const [editStartDate, setEditStartDate] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editType, setEditType] = useState<'loan' | 'installment'>('loan');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
 
   const handleAdd = () => {
     if (!name) return;
@@ -81,6 +84,18 @@ export default function LoansPage() {
     setPayAmount(''); setPayNote(''); setPayLoanId(null);
   };
 
+  const handleDeleteLoan = (loanId: string) => {
+    const loan = loans.find((item) => item.id === loanId);
+    if (!loan) return;
+    setPendingDelete({ id: loanId, label: loan.name });
+  };
+
+  const confirmDeleteLoan = () => {
+    if (!pendingDelete) return;
+    deleteLoan(pendingDelete.id);
+    setPendingDelete(null);
+  };
+
   const activeLoans = loans.filter((l) => l.type === 'loan');
   const installments = loans.filter((l) => l.type === 'installment');
   const totalOutstanding = loans.reduce((sum, loan) => sum + Math.max(0, loan.totalAmount - loan.paidAmount), 0);
@@ -118,7 +133,7 @@ export default function LoansPage() {
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(l.id)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => deleteLoan(l.id)}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => handleDeleteLoan(l.id)}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -154,11 +169,10 @@ export default function LoansPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Loans & Installments</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track your loans and log payments</p>
-        </div>
+      <PageHeader
+        title="Loans & Installments"
+        description="Track your loans and log payments"
+        actions={
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Loan/Installment</Button>
@@ -204,7 +218,8 @@ export default function LoansPage() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -298,6 +313,17 @@ export default function LoansPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete loan?"
+        description={
+          pendingDelete ? `Are you sure you want to delete loan "${pendingDelete.label}"? This action cannot be undone.` : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteLoan}
+      />
 
       {activeLoans.length > 0 && (
         <div>

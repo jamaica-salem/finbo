@@ -9,6 +9,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageHeader } from '@/components/PageHeader';
 import { useFinanceStore } from '@/store/financeStore';
 import { clearFinboDeviceData, createPinRecord, isValidPin, verifyPin } from '@/lib/security';
 import {
@@ -294,6 +295,7 @@ export default function SecurityPage() {
           type: transactionType,
           amount: normalizedAmount,
           category: categoryIndex >= 0 ? row[categoryIndex] || 'Other' : 'Other',
+          categories: categoryIndex >= 0 ? (row[categoryIndex] || 'Other').split(/[,\n;]/).map((item) => item.trim()).filter(Boolean) : ['Other'],
           description: descriptionIndex >= 0 ? row[descriptionIndex] || 'Imported transaction' : 'Imported transaction',
           date: rawDate,
         });
@@ -366,12 +368,10 @@ export default function SecurityPage() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Security</h1>
-          <p className="text-sm text-muted-foreground mt-1">Manage your local PIN and auto-lock behavior.</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Security"
+        description="Manage your local PIN and auto-lock behavior."
+      />
 
       <Alert className="border-amber-500/30 bg-amber-500/10">
         <TriangleAlert className="h-4 w-4 text-amber-600" />

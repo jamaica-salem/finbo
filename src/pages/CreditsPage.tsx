@@ -9,8 +9,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { PageHeader } from '@/components/PageHeader';
 import { Plus, Trash2, CreditCard, Pencil, ArrowDownLeft, ArrowUpRight, PhilippinePeso, Wallet, Percent, CalendarClock, ReceiptText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { type CreditCard as CreditCardType } from '@/types/finance';
 
 const networkLabels: Record<CreditCardType['network'], string> = {
@@ -85,6 +87,7 @@ export default function CreditsPage() {
   const [editOpenedDate, setEditOpenedDate] = useState('');
   const [editAutopay, setEditAutopay] = useState(false);
   const [editRewardsPoints, setEditRewardsPoints] = useState('0');
+  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
 
   const totalLimit = creditCards.reduce((sum, card) => sum + card.creditLimit, 0);
   const totalBalance = creditCards.reduce((sum, card) => sum + card.currentBalance, 0);
@@ -200,6 +203,18 @@ export default function CreditsPage() {
     setChargeCardId(null);
   };
 
+  const handleDeleteCard = (cardId: string) => {
+    const card = creditCards.find((item) => item.id === cardId);
+    if (!card) return;
+    setPendingDelete({ id: cardId, label: card.name });
+  };
+
+  const confirmDeleteCard = () => {
+    if (!pendingDelete) return;
+    deleteCreditCard(pendingDelete.id);
+    setPendingDelete(null);
+  };
+
   const renderCard = (card: CreditCardType) => {
     const utilization = card.creditLimit > 0 ? Math.min(100, Math.round((card.currentBalance / card.creditLimit) * 100)) : 0;
     const available = card.creditLimit - card.currentBalance;
@@ -231,7 +246,7 @@ export default function CreditsPage() {
             <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(card.id)}>
               <Pencil className="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => deleteCreditCard(card.id)}>
+            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => handleDeleteCard(card.id)}>
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </div>
@@ -306,11 +321,10 @@ export default function CreditsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-heading font-bold text-foreground">Credits</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track credit cards, balances, payments, and rewards</p>
-        </div>
+      <PageHeader
+        title="Credits"
+        description="Track credit cards, balances, payments, and rewards"
+        actions={
         <Dialog open={showAdd} onOpenChange={setShowAdd}>
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Card</Button>
@@ -392,7 +406,8 @@ export default function CreditsPage() {
             </div>
           </DialogContent>
         </Dialog>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -536,6 +551,17 @@ export default function CreditsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => !open && setPendingDelete(null)}
+        title="Delete credit card?"
+        description={
+          pendingDelete ? `Are you sure you want to delete credit card "${pendingDelete.label}"? This action cannot be undone.` : ''
+        }
+        confirmLabel="Delete"
+        onConfirm={confirmDeleteCard}
+      />
 
       {creditCards.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
