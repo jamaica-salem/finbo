@@ -10,6 +10,11 @@ import { Plus, Trash2, Check, Undo2, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BILL_CATEGORIES = ['Utilities', 'Entertainment', 'Insurance', 'Health', 'Transport', 'Subscription', 'Other'];
+const formatDueDate = (value: string) => {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 'No due date';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+};
 
 export default function BillsPage() {
   const { bills, addBill, updateBill, deleteBill, markBillPaid, markBillUnpaid, currency } = useFinanceStore();
@@ -18,7 +23,7 @@ export default function BillsPage() {
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('');
-  const [dueDay, setDueDay] = useState('');
+  const [dueDate, setDueDate] = useState('');
   const [recurring, setRecurring] = useState(true);
 
   // Edit state
@@ -26,13 +31,13 @@ export default function BillsPage() {
   const [editName, setEditName] = useState('');
   const [editAmount, setEditAmount] = useState('');
   const [editCategory, setEditCategory] = useState('');
-  const [editDueDay, setEditDueDay] = useState('');
+  const [editDueDate, setEditDueDate] = useState('');
   const [editRecurring, setEditRecurring] = useState(true);
 
   const handleAdd = () => {
-    if (!name || !amount || !dueDay) return;
-    addBill({ name, amount: parseFloat(amount), category: category || 'Other', dueDay: parseInt(dueDay), recurring, status: 'pending' });
-    setName(''); setAmount(''); setCategory(''); setDueDay(''); setShowAdd(false);
+    if (!name || !amount || !dueDate) return;
+    addBill({ name, amount: parseFloat(amount), category: category || 'Other', dueDate, recurring, status: 'pending' });
+    setName(''); setAmount(''); setCategory(''); setDueDate(''); setShowAdd(false);
   };
 
   const openEdit = (id: string) => {
@@ -42,32 +47,38 @@ export default function BillsPage() {
     setEditName(b.name);
     setEditAmount(String(b.amount));
     setEditCategory(b.category);
-    setEditDueDay(String(b.dueDay));
+    setEditDueDate(b.dueDate);
     setEditRecurring(b.recurring);
   };
 
   const handleEdit = () => {
-    if (!editId || !editName) return;
+    if (!editId || !editName || !editDueDate) return;
     updateBill(editId, {
       name: editName,
       amount: parseFloat(editAmount) || 0,
       category: editCategory || 'Other',
-      dueDay: parseInt(editDueDay) || 1,
+      dueDate: editDueDate,
       recurring: editRecurring,
     });
     setEditId(null);
   };
 
-  const today = new Date().getDate();
+  const today = new Date();
+  const getDueTime = (value: string) => {
+    const time = new Date(`${value}T00:00:00`).getTime();
+    return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+  };
+  const isOverdue = (bill: typeof bills[0]) => bill.status === 'overdue' || (bill.status === 'pending' && getDueTime(bill.dueDate) < today.getTime());
+  const sortByDueDate = (a: typeof bills[0], b: typeof bills[0]) => getDueTime(a.dueDate) - getDueTime(b.dueDate);
 
-  const overdue = bills.filter((b) => b.status === 'overdue' || (b.status === 'pending' && b.dueDay < today));
-  const pending = bills.filter((b) => b.status === 'pending' && b.dueDay >= today);
-  const paid = bills.filter((b) => b.status === 'paid');
+  const overdue = bills.filter(isOverdue).sort(sortByDueDate);
+  const pending = bills.filter((b) => b.status === 'pending' && !isOverdue(b)).sort(sortByDueDate);
+  const paid = bills.filter((b) => b.status === 'paid').sort(sortByDueDate);
 
   const renderBill = (b: typeof bills[0]) => (
     <div key={b.id} className={cn(
       'flex items-center justify-between py-3 px-4 rounded-lg border',
-      b.status === 'overdue' || (b.status === 'pending' && b.dueDay < today)
+      isOverdue(b)
         ? 'border-destructive/30 bg-destructive/5'
         : b.status === 'paid'
           ? 'border-success/30 bg-success/5'
@@ -75,7 +86,7 @@ export default function BillsPage() {
     )}>
       <div>
         <p className="text-sm font-medium text-foreground">{b.name}</p>
-        <p className="text-xs text-muted-foreground">{b.category} · Due: {b.dueDay}th {b.recurring && '· Recurring'}</p>
+        <p className="text-xs text-muted-foreground">{b.category} · Due Date: {formatDueDate(b.dueDate)} {b.recurring && '· Recurring'}</p>
       </div>
       <div className="flex items-center gap-2">
         <p className="text-sm font-semibold text-foreground">{currency}{b.amount.toFixed(2)}</p>
@@ -130,8 +141,8 @@ export default function BillsPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Due day</Label>
-                <Input placeholder="e.g. 15" type="number" min="1" max="31" value={dueDay} onChange={(e) => setDueDay(e.target.value)} />
+                <Label>Due date</Label>
+                <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </div>
               <div className="flex items-center justify-between pt-2">
                 <Label className="text-foreground">Recurring monthly</Label>
@@ -166,8 +177,8 @@ export default function BillsPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Due day</Label>
-              <Input placeholder="e.g. 15" type="number" min="1" max="31" value={editDueDay} onChange={(e) => setEditDueDay(e.target.value)} />
+              <Label>Due date</Label>
+              <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
             </div>
             <div className="flex items-center justify-between pt-2">
               <Label className="text-foreground">Recurring monthly</Label>

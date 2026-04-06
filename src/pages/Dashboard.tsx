@@ -14,6 +14,12 @@ const CHART_COLORS = [
   'hsl(150, 50%, 45%)',
 ];
 
+const formatDueDate = (value: string) => {
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return 'No due date';
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
+};
+
 export default function Dashboard() {
   const { accounts, transactions, loans, bills, currency } = useFinanceStore();
 
@@ -35,10 +41,14 @@ export default function Dashboard() {
   const totalBillsDue = bills.filter((b) => b.status !== 'paid').reduce((s, b) => s + b.amount, 0);
   const paidBills = bills.filter((b) => b.status === 'paid').length;
 
-  const today = new Date().getDate();
+  const now = new Date();
+  const getDueTime = (value: string) => {
+    const time = new Date(`${value}T00:00:00`).getTime();
+    return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
+  };
   const upcomingBills = bills
     .filter((b) => b.status !== 'paid')
-    .sort((a, b) => a.dueDay - b.dueDay);
+    .sort((a, b) => getDueTime(a.dueDate) - getDueTime(b.dueDate));
 
   // Cashflow chart data
   const cashflowData = [
@@ -156,15 +166,15 @@ export default function Dashboard() {
                 <div key={b.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
                   <div>
                     <p className="text-sm font-medium text-foreground">{b.name}</p>
-                    <p className="text-xs text-muted-foreground">Due: {b.dueDay}th of the month</p>
+                    <p className="text-xs text-muted-foreground">Due: {formatDueDate(b.dueDate)}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-semibold text-foreground">{currency}{b.amount.toFixed(2)}</p>
                     <span className={cn(
                       'text-xs font-medium',
-                      b.status === 'overdue' ? 'text-destructive' : 'text-warning'
+                      b.status === 'overdue' || getDueTime(b.dueDate) < now.getTime() ? 'text-destructive' : 'text-warning'
                     )}>
-                      {b.status === 'overdue' ? 'Overdue' : 'Pending'}
+                      {b.status === 'overdue' || getDueTime(b.dueDate) < now.getTime() ? 'Overdue' : 'Pending'}
                     </span>
                   </div>
                 </div>
