@@ -11,6 +11,7 @@ import type {
   CreditCardActivity,
   SavingsGoal,
   SavingsGoalContribution,
+  FinanceDataState,
 } from '@/types/finance';
 
 // Generate a simple ID
@@ -106,6 +107,7 @@ interface FinanceState {
   
   // Settings actions
   setCurrency: (currency: string) => void;
+  replaceFinanceData: (data: FinanceDataState) => void;
 }
 
 export const useFinanceStore = create<FinanceState>()(
@@ -268,6 +270,18 @@ export const useFinanceStore = create<FinanceState>()(
   }),
 
   setCurrency: (currency) => set({ currency }),
+  replaceFinanceData: (data) => set({
+    accounts: data.accounts,
+    transactions: data.transactions,
+    loans: data.loans,
+    loanPayments: data.loanPayments,
+    creditCards: data.creditCards,
+    creditCardActivities: data.creditCardActivities,
+    bills: data.bills,
+    savingsGoals: data.savingsGoals,
+    savingsGoalContributions: data.savingsGoalContributions,
+    currency: data.currency,
+  }),
     }),
     {
       name: 'finbo-storage',

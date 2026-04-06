@@ -115,3 +115,22 @@ export interface SavingsGoalContribution {
   date: string;
   note?: string;
 }
+
+export interface FinanceDataState {
+  accounts: Account[];
+  transactions: Transaction[];
+  loans: Loan[];
+  loanPayments: LoanPayment[];
+  creditCards: CreditCard[];
+  creditCardActivities: CreditCardActivity[];
+  bills: Bill[];
+  savingsGoals: SavingsGoal[];
+  savingsGoalContributions: SavingsGoalContribution[];
+  currency: string;
+}
+
+export interface FinanceBackupSnapshot {
+  version: 1;
+  exportedAt: string;
+  data: FinanceDataState;
+}
