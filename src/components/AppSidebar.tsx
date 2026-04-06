@@ -24,7 +24,7 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
         collapsed ? 'w-20' : 'w-64',
       )}
     >
-      <div className={cn('flex items-center gap-3 px-3 py-4', collapsed ? 'justify-start' : 'justify-between')}>
+      <div className={cn('flex items-center gap-3 px-3 py-4', collapsed ? 'justify-center' : 'justify-between')}>
         <div className="flex items-center gap-2">
           <img src="/favicon.ico" alt="Finbo Logo" className="h-10 w-10 rounded-xl" />
           {!collapsed && (
@@ -35,7 +35,7 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
         </div>
         {!collapsed && <ThemeToggle />}
       </div>
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className={cn('flex-1 space-y-1 py-4', collapsed ? 'px-2' : 'px-3')}>
         {navItems.map(({ to, label, icon: Icon }) => (
           <RouterNavLink
             key={to}
@@ -45,7 +45,8 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
             aria-label={label}
             className={({ isActive }) =>
               cn(
-                'group flex h-11 items-center gap-3 rounded-xl px-3 text-sm font-medium transition-colors',
+                'group flex h-11 items-center rounded-xl text-sm font-medium transition-colors',
+                collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                 isActive
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -66,31 +67,31 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
           </RouterNavLink>
         ))}
       </nav>
-      <div className="border-t border-border px-3 py-4">
+      <div className={cn('px-3 pb-4 pt-3', collapsed ? 'space-y-3' : 'space-y-4')}>
         {!collapsed && (
-          <div className="rounded-lg bg-accent/50 border border-border p-3">
-            <p className="text-xs font-medium text-accent-foreground">Currency</p>
-            <Select value={currency} onValueChange={setCurrency}>
-              <SelectTrigger className="h-8 mt-2 text-xs">
-                <SelectValue placeholder="Select currency" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="₱">PHP (₱)</SelectItem>
-                <SelectItem value="$">USD ($)</SelectItem>
-                <SelectItem value="€">EUR (€)</SelectItem>
-                <SelectItem value="£">GBP (£)</SelectItem>
-                <SelectItem value="¥">JPY (¥)</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-3">
+            <div className="rounded-lg bg-accent/50 border border-border p-3">
+              <p className="text-xs font-medium text-accent-foreground">Currency</p>
+              <Select value={currency} onValueChange={setCurrency}>
+                <SelectTrigger className="mt-2 h-8 text-xs">
+                  <SelectValue placeholder="Select currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="₱">PHP (₱)</SelectItem>
+                  <SelectItem value="$">USD ($)</SelectItem>
+                  <SelectItem value="€">EUR (€)</SelectItem>
+                  <SelectItem value="£">GBP (£)</SelectItem>
+                  <SelectItem value="¥">JPY (¥)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-lg bg-accent/50 border border-border p-3">
+              <p className="text-xs font-medium text-accent-foreground">Pro Tip</p>
+              <p className="text-xs text-muted-foreground mt-1">Track every expense to build better habits.</p>
+            </div>
           </div>
         )}
-        {!collapsed && (
-          <div className="rounded-lg bg-accent/50 border border-border p-3">
-            <p className="text-xs font-medium text-accent-foreground">Pro Tip</p>
-            <p className="text-xs text-muted-foreground mt-1">Track every expense to build better habits.</p>
-          </div>
-        )}
-        <div className={cn('flex items-center gap-2', collapsed ? 'justify-start' : 'justify-end mt-2')}>
+        <div className={cn('flex items-center gap-2', collapsed ? 'justify-center' : 'justify-end mt-1')}>
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={cn(
