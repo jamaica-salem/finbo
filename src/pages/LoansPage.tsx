@@ -18,9 +18,9 @@ export default function LoansPage() {
 
   // Add form
   const [name, setName] = useState('');
-  const [total, setTotal] = useState('');
-  const [monthly, setMonthly] = useState('');
-  const [interest, setInterest] = useState('');
+  const [total, setTotal] = useState('0');
+  const [monthly, setMonthly] = useState('0');
+  const [interest, setInterest] = useState('0');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [loanType, setLoanType] = useState<'loan' | 'installment'>('loan');
@@ -37,12 +37,12 @@ export default function LoansPage() {
   const [editType, setEditType] = useState<'loan' | 'installment'>('loan');
 
   const handleAdd = () => {
-    if (!name || !total || !monthly) return;
+    if (!name) return;
     addLoan({
       name, totalAmount: parseFloat(total), paidAmount: 0, monthlyPayment: parseFloat(monthly),
       interestRate: parseFloat(interest) || 0, startDate, dueDate, type: loanType,
     });
-    setName(''); setTotal(''); setMonthly(''); setInterest(''); setShowAdd(false);
+    setName(''); setTotal('0'); setMonthly('0'); setInterest('0'); setShowAdd(false);
   };
 
   const openEdit = (id: string) => {

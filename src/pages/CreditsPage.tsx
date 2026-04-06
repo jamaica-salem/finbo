@@ -56,13 +56,13 @@ export default function CreditsPage() {
   const [name, setName] = useState('');
   const [issuer, setIssuer] = useState('');
   const [network, setNetwork] = useState<CreditCardType['network']>('visa');
-  const [creditLimit, setCreditLimit] = useState('');
-  const [currentBalance, setCurrentBalance] = useState('');
-  const [statementBalance, setStatementBalance] = useState('');
-  const [minimumPayment, setMinimumPayment] = useState('');
-  const [apr, setApr] = useState('');
-  const [rewardsRate, setRewardsRate] = useState('');
-  const [annualFee, setAnnualFee] = useState('');
+  const [creditLimit, setCreditLimit] = useState('0');
+  const [currentBalance, setCurrentBalance] = useState('0');
+  const [statementBalance, setStatementBalance] = useState('0');
+  const [minimumPayment, setMinimumPayment] = useState('0');
+  const [apr, setApr] = useState('0');
+  const [rewardsRate, setRewardsRate] = useState('0');
+  const [annualFee, setAnnualFee] = useState('0');
   const [dueDate, setDueDate] = useState('');
   const [statementCloseDate, setStatementCloseDate] = useState('');
   const [openedDate, setOpenedDate] = useState('');
@@ -118,13 +118,13 @@ export default function CreditsPage() {
     setName('');
     setIssuer('');
     setNetwork('visa');
-    setCreditLimit('');
-    setCurrentBalance('');
-    setStatementBalance('');
-    setMinimumPayment('');
-    setApr('');
-    setRewardsRate('');
-    setAnnualFee('');
+    setCreditLimit('0');
+    setCurrentBalance('0');
+    setStatementBalance('0');
+    setMinimumPayment('0');
+    setApr('0');
+    setRewardsRate('0');
+    setAnnualFee('0');
     setDueDate('');
     setStatementCloseDate('');
     setOpenedDate('');
@@ -132,11 +132,11 @@ export default function CreditsPage() {
   };
 
   const handleAdd = () => {
-    if (!name || !issuer || !creditLimit) return;
+    if (!name || !issuer) return;
 
     const limit = parseFloat(creditLimit) || 0;
     const current = parseFloat(currentBalance) || 0;
-    const statement = statementBalance === '' ? current : parseFloat(statementBalance) || 0;
+    const statement = parseFloat(statementBalance) || 0;
 
     addCreditCard({
       name,

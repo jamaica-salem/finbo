@@ -21,7 +21,7 @@ export default function BillsPage() {
   const [showAdd, setShowAdd] = useState(false);
 
   const [name, setName] = useState('');
-  const [amount, setAmount] = useState('');
+  const [amount, setAmount] = useState('0');
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [recurring, setRecurring] = useState(true);
@@ -35,9 +35,9 @@ export default function BillsPage() {
   const [editRecurring, setEditRecurring] = useState(true);
 
   const handleAdd = () => {
-    if (!name || !amount || !dueDate) return;
-    addBill({ name, amount: parseFloat(amount), category: category || 'Other', dueDate, recurring, status: 'pending' });
-    setName(''); setAmount(''); setCategory(''); setDueDate(''); setShowAdd(false);
+    if (!name || !dueDate) return;
+    addBill({ name, amount: parseFloat(amount) || 0, category: category || 'Other', dueDate, recurring, status: 'pending' });
+    setName(''); setAmount('0'); setCategory(''); setDueDate(''); setShowAdd(false);
   };
 
   const openEdit = (id: string) => {
