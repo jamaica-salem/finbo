@@ -47,9 +47,9 @@ export default function CreditsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [payCardId, setPayCardId] = useState<string | null>(null);
   const [chargeCardId, setChargeCardId] = useState<string | null>(null);
-  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentAmount, setPaymentAmount] = useState('0');
   const [paymentNote, setPaymentNote] = useState('');
-  const [chargeAmount, setChargeAmount] = useState('');
+  const [chargeAmount, setChargeAmount] = useState('0');
   const [chargeNote, setChargeNote] = useState('');
 
   // Add form
@@ -73,18 +73,18 @@ export default function CreditsPage() {
   const [editName, setEditName] = useState('');
   const [editIssuer, setEditIssuer] = useState('');
   const [editNetwork, setEditNetwork] = useState<CreditCardType['network']>('visa');
-  const [editCreditLimit, setEditCreditLimit] = useState('');
-  const [editCurrentBalance, setEditCurrentBalance] = useState('');
-  const [editStatementBalance, setEditStatementBalance] = useState('');
-  const [editMinimumPayment, setEditMinimumPayment] = useState('');
-  const [editApr, setEditApr] = useState('');
-  const [editRewardsRate, setEditRewardsRate] = useState('');
-  const [editAnnualFee, setEditAnnualFee] = useState('');
+  const [editCreditLimit, setEditCreditLimit] = useState('0');
+  const [editCurrentBalance, setEditCurrentBalance] = useState('0');
+  const [editStatementBalance, setEditStatementBalance] = useState('0');
+  const [editMinimumPayment, setEditMinimumPayment] = useState('0');
+  const [editApr, setEditApr] = useState('0');
+  const [editRewardsRate, setEditRewardsRate] = useState('0');
+  const [editAnnualFee, setEditAnnualFee] = useState('0');
   const [editDueDate, setEditDueDate] = useState('');
   const [editStatementCloseDate, setEditStatementCloseDate] = useState('');
   const [editOpenedDate, setEditOpenedDate] = useState('');
   const [editAutopay, setEditAutopay] = useState(false);
-  const [editRewardsPoints, setEditRewardsPoints] = useState('');
+  const [editRewardsPoints, setEditRewardsPoints] = useState('0');
 
   const totalLimit = creditCards.reduce((sum, card) => sum + card.creditLimit, 0);
   const totalBalance = creditCards.reduce((sum, card) => sum + card.currentBalance, 0);

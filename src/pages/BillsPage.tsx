@@ -34,7 +34,7 @@ export default function BillsPage() {
   // Edit state
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [editAmount, setEditAmount] = useState('');
+  const [editAmount, setEditAmount] = useState('0');
   const [editCategory, setEditCategory] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editRecurring, setEditRecurring] = useState(true);

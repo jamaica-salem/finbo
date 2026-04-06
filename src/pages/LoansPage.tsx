@@ -14,7 +14,7 @@ export default function LoansPage() {
   const { loans, addLoan, updateLoan, deleteLoan, logLoanPayment, currency } = useFinanceStore();
   const [showAdd, setShowAdd] = useState(false);
   const [payLoanId, setPayLoanId] = useState<string | null>(null);
-  const [payAmount, setPayAmount] = useState('');
+  const [payAmount, setPayAmount] = useState('0');
   const [payNote, setPayNote] = useState('');
 
   // Add form
@@ -29,10 +29,10 @@ export default function LoansPage() {
   // Edit form
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
-  const [editTotal, setEditTotal] = useState('');
-  const [editPaid, setEditPaid] = useState('');
-  const [editMonthly, setEditMonthly] = useState('');
-  const [editInterest, setEditInterest] = useState('');
+  const [editTotal, setEditTotal] = useState('0');
+  const [editPaid, setEditPaid] = useState('0');
+  const [editMonthly, setEditMonthly] = useState('0');
+  const [editInterest, setEditInterest] = useState('0');
   const [editStartDate, setEditStartDate] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editType, setEditType] = useState<'loan' | 'installment'>('loan');

@@ -22,7 +22,7 @@ export default function AccountsPage() {
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
   const [editAName, setEditAName] = useState('');
   const [editAType, setEditAType] = useState<AccountType>('bank');
-  const [editABal, setEditABal] = useState('');
+  const [editABal, setEditABal] = useState('0');
 
   // Add account form
   const [aName, setAName] = useState('');
@@ -32,14 +32,14 @@ export default function AccountsPage() {
   // Add transaction form
   const [txAccount, setTxAccount] = useState('');
   const [txType, setTxType] = useState<'income' | 'expense'>('expense');
-  const [txAmount, setTxAmount] = useState('');
+  const [txAmount, setTxAmount] = useState('0');
   const [txCategory, setTxCategory] = useState('');
   const [txDesc, setTxDesc] = useState('');
   const [txDate, setTxDate] = useState(new Date().toISOString().split('T')[0]);
 
   const handleAddAccount = () => {
     if (!aName) return;
-    addAccount({ name: aName, type: aType, balance: parseFloat(aBal) || 0, currency: 'USD', color: 'hsl(172, 66%, 40%)' });
+    addAccount({ name: aName, type: aType, balance: parseFloat(aBal) || 0, currency, color: 'hsl(172, 66%, 40%)' });
     setAName(''); setABal('0'); setShowAddAccount(false);
   };
 
