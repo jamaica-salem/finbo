@@ -93,3 +93,25 @@ export interface BillInstance {
   status: BillStatus;
   paidDate?: string;
 }
+
+export type SavingsGoalCategory = 'Vacation' | 'Emergency Fund' | 'Home' | 'Education' | 'Tech' | 'Other';
+
+export interface SavingsGoal {
+  id: string;
+  name: string;
+  category: SavingsGoalCategory;
+  targetAmount: number;
+  savedAmount: number;
+  targetDate?: string;
+  createdAt: string;
+  completedAt?: string;
+  note?: string;
+}
+
+export interface SavingsGoalContribution {
+  id: string;
+  goalId: string;
+  amount: number;
+  date: string;
+  note?: string;
+}
