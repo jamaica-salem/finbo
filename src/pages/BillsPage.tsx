@@ -22,7 +22,7 @@ const formatMonthLabel = (value: string) => {
 };
 
 export default function BillsPage() {
-  const { bills, addBill, updateBill, deleteBill, markBillPaid, markBillUnpaid, currency } = useFinanceStore();
+  const { bills, addBill, updateBill, deleteBill, markBillPaid, currency } = useFinanceStore();
   const [showAdd, setShowAdd] = useState(false);
 
   const [name, setName] = useState('');
@@ -74,7 +74,8 @@ export default function BillsPage() {
     return Number.isNaN(time) ? Number.POSITIVE_INFINITY : time;
   };
   const isOverdue = (bill: typeof bills[0]) => bill.status === 'overdue' || (bill.status === 'pending' && getDueTime(bill.dueDate) < today.getTime());
-  const sortedBills = [...bills].sort((a, b) => getDueTime(a.dueDate) - getDueTime(b.dueDate));
+  const activeBills = bills.filter((bill) => bill.status !== 'paid');
+  const sortedBills = [...activeBills].sort((a, b) => getDueTime(a.dueDate) - getDueTime(b.dueDate));
   const billsByMonth = sortedBills.reduce<Record<string, typeof bills>>((groups, bill) => {
     const date = new Date(`${bill.dueDate}T00:00:00`);
     const monthKey = Number.isNaN(date.getTime()) ? 'no-due-date' : `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
@@ -103,15 +104,9 @@ export default function BillsPage() {
       </div>
       <div className="flex items-center gap-2">
         <p className="text-sm font-semibold text-foreground">{currency}{b.amount.toFixed(2)}</p>
-        {b.status !== 'paid' ? (
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => markBillPaid(b.id)}>
-            <Check className="h-3.5 w-3.5" />
-          </Button>
-        ) : (
-          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => markBillUnpaid(b.id)}>
-            <Undo2 className="h-3.5 w-3.5" />
-          </Button>
-        )}
+        <Button variant="ghost" size="icon" className="h-7 w-7 text-success" onClick={() => markBillPaid(b.id)}>
+          <Check className="h-3.5 w-3.5" />
+        </Button>
         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEdit(b.id)}>
           <Pencil className="h-3 w-3" />
         </Button>
@@ -216,6 +211,12 @@ export default function BillsPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {bills.length > 0 && activeBills.length === 0 && (
+        <div className="glass-card rounded-xl p-12 text-center">
+          <p className="text-muted-foreground">All bills have been marked paid.</p>
         </div>
       )}
 
