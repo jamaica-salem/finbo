@@ -16,6 +16,8 @@ import BillsPage from "./pages/BillsPage";
 import BudgetPage from "./pages/BudgetPage";
 import SavingsGoalsPage from "./pages/SavingsGoalsPage";
 import SecurityPage from "./pages/SecurityPage";
+import OnboardingPage from "./pages/OnboardingPage";
+import SupportPage from "./pages/SupportPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import NotFound from "./pages/NotFound";
 
@@ -88,6 +90,8 @@ const App = () => (
               <Route path="/budget" element={<BudgetPage />} />
               <Route path="/savings" element={<SavingsGoalsPage />} />
               <Route path="/security" element={<SecurityPage />} />
+              <Route path="/onboarding" element={<OnboardingPage />} />
+              <Route path="/support" element={<SupportPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

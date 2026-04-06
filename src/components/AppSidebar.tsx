@@ -1,5 +1,5 @@
 import { NavLink as RouterNavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3, ChevronLeft, ChevronRight, CreditCard, PiggyBank, Shield, Target } from 'lucide-react';
+import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3, ChevronLeft, ChevronRight, CreditCard, PiggyBank, Shield, Target, Sparkles, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { useFinanceStore } from '@/store/financeStore';
@@ -14,6 +14,12 @@ const navItems = [
   { to: '/budget', label: 'Budget', icon: Target },
   { to: '/bills', label: 'Bills', icon: Receipt },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
+];
+
+const settingsItems = [
+  { to: '/security', label: 'Security', icon: Shield },
+  { to: '/onboarding', label: 'Onboarding', icon: Sparkles },
+  { to: '/support', label: 'Support', icon: Gift },
 ];
 
 export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCollapsed: (val: boolean) => void }) {
@@ -75,44 +81,52 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
           {!collapsed ? (
             <div className="space-y-2">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">App settings</p>
-              <RouterNavLink
-                to="/security"
-                title="Security"
-                aria-label="Security"
-                className={({ isActive }) =>
-                  cn(
-                    'group flex h-11 items-center rounded-xl text-sm font-medium transition-all duration-300 ease-in-out',
-                    collapsed ? 'justify-center px-0' : 'gap-3 px-3',
-                    isActive
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                  )
-                }
-              >
-                <span className="flex w-5 shrink-0 items-center justify-center transition-all duration-300 ease-in-out">
-                  <Shield className="h-4 w-4" />
-                </span>
-                <span className="truncate overflow-hidden whitespace-nowrap max-w-[10rem] translate-x-0 opacity-100">
-                  Security
-                </span>
-              </RouterNavLink>
+              {settingsItems.map(({ to, label, icon: Icon }) => (
+                <RouterNavLink
+                  key={to}
+                  to={to}
+                  title={label}
+                  aria-label={label}
+                  className={({ isActive }) =>
+                    cn(
+                      'group flex h-11 items-center rounded-xl text-sm font-medium transition-all duration-300 ease-in-out',
+                      'gap-3 px-3',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    )
+                  }
+                >
+                  <span className="flex w-5 shrink-0 items-center justify-center transition-all duration-300 ease-in-out">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="truncate overflow-hidden whitespace-nowrap max-w-[10rem] translate-x-0 opacity-100">
+                    {label}
+                  </span>
+                </RouterNavLink>
+              ))}
             </div>
           ) : (
-            <RouterNavLink
-              to="/security"
-              title="Security"
-              aria-label="Security"
-              className={({ isActive }) =>
-                cn(
-                  'group flex h-11 items-center justify-center rounded-xl text-sm font-medium transition-all duration-300 ease-in-out',
-                  isActive
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                )
-              }
-            >
-              <Shield className="h-4 w-4" />
-            </RouterNavLink>
+            <div className="space-y-2">
+              {settingsItems.map(({ to, label, icon: Icon }) => (
+                <RouterNavLink
+                  key={to}
+                  to={to}
+                  title={label}
+                  aria-label={label}
+                  className={({ isActive }) =>
+                    cn(
+                      'group flex h-11 items-center justify-center rounded-xl text-sm font-medium transition-all duration-300 ease-in-out',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                    )
+                  }
+                >
+                  <Icon className="h-4 w-4" />
+                </RouterNavLink>
+              ))}
+            </div>
           )}
         </div>
         {!collapsed && (
@@ -131,10 +145,6 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
                   <SelectItem value="¥">JPY (¥)</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-            <div className="rounded-lg border border-border bg-accent/50 p-3 transition-all duration-300 ease-in-out">
-              <p className="text-xs font-medium text-accent-foreground">Pro Tip</p>
-              <p className="text-xs text-muted-foreground mt-1">Track every expense to build better habits.</p>
             </div>
           </div>
         )}
