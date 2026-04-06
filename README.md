@@ -1,4 +1,4 @@
-# Finbo - AI-Powered Financial Assistant
+# Finbo - Privacy-First AI-Powered Financial Assistant
 
 Finbo is an intelligent financial assistant designed to help users manage their money more effectively. By leveraging advanced AI, Finbo provides personalized insights, automated savings, and smart investment recommendations.
 
