@@ -9,20 +9,24 @@ const csvEscape = (value: string) => {
 
 const normalizeCell = (value: unknown) => String(value ?? '').trim();
 
+const toArray = <T>(value: unknown): T[] => (Array.isArray(value) ? value : []);
+const toRecord = (value: unknown): Record<string, string> => (value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, string>) : {});
+
 export const buildFinanceBackupSnapshot = (data: FinanceDataState): FinanceBackupSnapshot => ({
   version: 1,
   exportedAt: new Date().toISOString(),
   data: {
-    accounts: [...data.accounts],
-    transactions: [...data.transactions],
-    loans: [...data.loans],
-    loanPayments: [...data.loanPayments],
-    creditCards: [...data.creditCards],
-    creditCardActivities: [...data.creditCardActivities],
-    budgets: [...data.budgets],
-    bills: [...data.bills],
-    savingsGoals: [...data.savingsGoals],
-    savingsGoalContributions: [...data.savingsGoalContributions],
+    accounts: [...toArray<Account>(data.accounts)],
+    transactions: [...toArray<Transaction>(data.transactions)],
+    loans: [...toArray(data.loans)],
+    loanPayments: [...toArray(data.loanPayments)],
+    creditCards: [...toArray(data.creditCards)],
+    creditCardActivities: [...toArray(data.creditCardActivities)],
+    budgets: [...toArray(data.budgets)],
+    categoryColors: { ...toRecord(data.categoryColors) },
+    bills: [...toArray(data.bills)],
+    savingsGoals: [...toArray(data.savingsGoals)],
+    savingsGoalContributions: [...toArray(data.savingsGoalContributions)],
     currency: data.currency,
   },
 });
@@ -58,6 +62,7 @@ export const normalizeFinanceBackupSnapshot = (value: unknown): FinanceBackupSna
       creditCards: data.creditCards as FinanceDataState['creditCards'],
       creditCardActivities: data.creditCardActivities as FinanceDataState['creditCardActivities'],
       budgets: Array.isArray(data.budgets) ? (data.budgets as FinanceDataState['budgets']) : [],
+      categoryColors: (data.categoryColors as FinanceDataState['categoryColors']) ?? {},
       bills: data.bills as FinanceDataState['bills'],
       savingsGoals: data.savingsGoals as FinanceDataState['savingsGoals'],
       savingsGoalContributions: data.savingsGoalContributions as FinanceDataState['savingsGoalContributions'],
@@ -94,6 +99,194 @@ export const exportTransactionsCsv = (transactions: Transaction[], accounts: Acc
   return [headers, ...rows]
     .map((row) => row.map((cell) => csvEscape(normalizeCell(cell))).join(','))
     .join('\n');
+};
+
+const serializeCsvTable = (title: string, headers: string[], rows: string[][]) => {
+  const lines = [`# ${title}`, headers.join(','), ...rows.map((row) => row.map((cell) => csvEscape(normalizeCell(cell))).join(','))];
+  return lines.join('\n');
+};
+
+export const exportFinanceCsv = (data: FinanceDataState) => {
+  const sections = [
+    serializeCsvTable(
+      'Accounts',
+      ['id', 'name', 'type', 'balance', 'currency', 'color'],
+      data.accounts.map((account) => [
+        account.id,
+        account.name,
+        account.type,
+        String(account.balance),
+        account.currency,
+        account.color,
+      ]),
+    ),
+    serializeCsvTable(
+      'Transactions',
+      ['id', 'accountId', 'type', 'amount', 'category', 'categories', 'description', 'date', 'tags', 'recurringRuleId', 'scheduledDate'],
+      data.transactions.map((transaction) => [
+        transaction.id,
+        transaction.accountId,
+        transaction.type,
+        String(transaction.amount),
+        transaction.category,
+        (transaction.categories ?? []).join('; '),
+        transaction.description,
+        transaction.date,
+        (transaction.tags ?? []).join('; '),
+        transaction.recurringRuleId ?? '',
+        transaction.scheduledDate ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Recurring Rules',
+      ['id', 'label', 'accountId', 'type', 'amount', 'category', 'description', 'frequency', 'intervalDays', 'startDate', 'nextRunDate', 'endDate', 'active', 'createdAt', 'lastGeneratedDate'],
+      data.recurringTransactionRules.map((rule) => [
+        rule.id,
+        rule.label,
+        rule.accountId,
+        rule.type,
+        String(rule.amount),
+        rule.category,
+        rule.description,
+        rule.frequency,
+        String(rule.intervalDays ?? ''),
+        rule.startDate,
+        rule.nextRunDate,
+        rule.endDate ?? '',
+        String(rule.active),
+        rule.createdAt,
+        rule.lastGeneratedDate ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Budgets',
+      ['id', 'category', 'limitAmount', 'alertThresholdPct', 'active', 'createdAt', 'updatedAt', 'lastWarningMonthKey', 'lastExceededMonthKey'],
+      data.budgets.map((budget) => [
+        budget.id,
+        budget.category,
+        String(budget.limitAmount),
+        String(budget.alertThresholdPct),
+        String(budget.active),
+        budget.createdAt,
+        budget.updatedAt,
+        budget.lastWarningMonthKey ?? '',
+        budget.lastExceededMonthKey ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Loans',
+      ['id', 'name', 'totalAmount', 'paidAmount', 'monthlyPayment', 'interestRate', 'startDate', 'dueDate', 'type'],
+      data.loans.map((loan) => [
+        loan.id,
+        loan.name,
+        String(loan.totalAmount),
+        String(loan.paidAmount),
+        String(loan.monthlyPayment),
+        String(loan.interestRate),
+        loan.startDate,
+        loan.dueDate,
+        loan.type,
+      ]),
+    ),
+    serializeCsvTable(
+      'Loan Payments',
+      ['id', 'loanId', 'amount', 'date', 'note'],
+      data.loanPayments.map((payment) => [
+        payment.id,
+        payment.loanId,
+        String(payment.amount),
+        payment.date,
+        payment.note ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Credit Cards',
+      ['id', 'name', 'issuer', 'network', 'creditLimit', 'currentBalance', 'statementBalance', 'minimumPayment', 'apr', 'rewardsRate', 'annualFee', 'dueDate', 'statementCloseDate', 'openedDate', 'autopay', 'rewardsPoints', 'lastPaymentDate'],
+      data.creditCards.map((card) => [
+        card.id,
+        card.name,
+        card.issuer,
+        card.network,
+        String(card.creditLimit),
+        String(card.currentBalance),
+        String(card.statementBalance),
+        String(card.minimumPayment),
+        String(card.apr),
+        String(card.rewardsRate),
+        String(card.annualFee),
+        card.dueDate,
+        card.statementCloseDate,
+        card.openedDate,
+        String(card.autopay),
+        String(card.rewardsPoints),
+        card.lastPaymentDate ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Credit Card Activity',
+      ['id', 'cardId', 'type', 'amount', 'date', 'note'],
+      data.creditCardActivities.map((activity) => [
+        activity.id,
+        activity.cardId,
+        activity.type,
+        String(activity.amount),
+        activity.date,
+        activity.note ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Bills',
+      ['id', 'name', 'amount', 'category', 'dueDate', 'recurring', 'status', 'paidDate'],
+      data.bills.map((bill) => [
+        bill.id,
+        bill.name,
+        String(bill.amount),
+        bill.category,
+        bill.dueDate,
+        String(bill.recurring),
+        bill.status,
+        bill.paidDate ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Savings Goals',
+      ['id', 'name', 'category', 'targetAmount', 'savedAmount', 'targetDate', 'createdAt', 'completedAt', 'note'],
+      data.savingsGoals.map((goal) => [
+        goal.id,
+        goal.name,
+        goal.category,
+        String(goal.targetAmount),
+        String(goal.savedAmount),
+        goal.targetDate ?? '',
+        goal.createdAt,
+        goal.completedAt ?? '',
+        goal.note ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Savings Contributions',
+      ['id', 'goalId', 'amount', 'date', 'note'],
+      data.savingsGoalContributions.map((contribution) => [
+        contribution.id,
+        contribution.goalId,
+        String(contribution.amount),
+        contribution.date,
+        contribution.note ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Category Colors',
+      ['category', 'color'],
+      Object.entries(data.categoryColors).map(([category, color]) => [category, color]),
+    ),
+    serializeCsvTable(
+      'Currency',
+      ['symbol'],
+      [[data.currency]],
+    ),
+  ];
+
+  return sections.join('\n\n');
 };
 
 export interface CsvTable {

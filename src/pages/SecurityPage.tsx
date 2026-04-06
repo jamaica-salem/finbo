@@ -15,7 +15,7 @@ import { clearFinboDeviceData, createPinRecord, isValidPin, verifyPin } from '@/
 import {
   buildFinanceBackupSnapshot,
   downloadTextFile,
-  exportTransactionsCsv,
+  exportFinanceCsv,
   normalizeFinanceBackupSnapshot,
   normalizeHeader,
   parseCsvTable,
@@ -170,11 +170,24 @@ export default function SecurityPage() {
 
   const handleExportCsv = () => {
     downloadTextFile(
-      `finbo-transactions-${new Date().toISOString().slice(0, 10)}.csv`,
-      exportTransactionsCsv(transactions, accounts),
+      `finbo-backup-${new Date().toISOString().slice(0, 10)}.csv`,
+      exportFinanceCsv({
+        accounts,
+        transactions,
+        loans,
+        loanPayments,
+        creditCards,
+        creditCardActivities,
+        budgets: finance.budgets,
+        categoryColors: finance.categoryColors,
+        bills,
+        savingsGoals,
+        savingsGoalContributions,
+        currency,
+      }),
       'text/csv',
     );
-    toast.success('CSV export downloaded.');
+    toast.success('CSV backup downloaded.');
   };
 
   const handleJsonFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -577,8 +590,8 @@ export default function SecurityPage() {
           <Alert className="border-border bg-muted/30">
             <AlertTitle>Backup contents</AlertTitle>
             <AlertDescription>
-              JSON backups include all stored finance data. CSV backups contain transactions only and are best for
-              sharing or importing into spreadsheets.
+              JSON and CSV backups both include all stored finance data. CSV is structured as multiple tables in one file,
+              which is handy for spreadsheets and external tools.
             </AlertDescription>
           </Alert>
 
