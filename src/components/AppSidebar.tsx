@@ -1,5 +1,5 @@
 import { NavLink as RouterNavLink } from 'react-router-dom';
-import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3, ChevronLeft, Menu } from 'lucide-react';
+import { LayoutDashboard, Wallet, TrendingDown, Receipt, BarChart3, ChevronLeft, Menu, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { useFinanceStore } from '@/store/financeStore';
@@ -9,6 +9,7 @@ const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
   { to: '/loans', label: 'Loans', icon: TrendingDown },
+  { to: '/credits', label: 'Credits', icon: CreditCard },
   { to: '/bills', label: 'Bills', icon: Receipt },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
