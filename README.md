@@ -1,14 +1,21 @@
-# Finbo - Privacy-First AI-Powered Financial Assistant
+# Finbo - Privacy-First Financial Assistant
 
-Finbo is an intelligent financial assistant designed to help users manage their money more effectively. By leveraging advanced AI, Finbo provides personalized insights, automated savings, and smart investment recommendations.
+Finbo is a personal finance web app designed to help users track money across budgets, bills, loans, savings goals, accounts, and analytics. It focuses on clarity, security, and practical day-to-day money management.
 
 ## Features
 
-- **AI-Powered Insights**: Analyzes spending patterns and provides actionable recommendations.
-- **Automated Savings**: Automatically sets aside money for savings goals based on user behavior.
-- **Smart Investments**: Recommends investment opportunities tailored to risk tolerance.
-- **Budget Tracking**: Real-time tracking of expenses and budget adherence.
-- **Goal Planning**: Helps users set and achieve financial goals.
+- **Dashboard Overview**: See balances, progress, and key financial metrics at a glance.
+- **Budget Tracking**: Track spending against monthly budgets and monitor remaining amounts.
+- **Bills Management**: Organize bills, mark them paid, and keep recurring obligations visible.
+- **Loans Tracking**: Follow outstanding balances and repayment progress.
+- **Savings Goals**: Set goals and watch savings progress over time.
+- **Analytics**: Review income and spending patterns with charts and summaries.
+- **Security Tools**: Protect access with PIN-based locking and privacy-focused local security settings.
+- **Backup and Support**: Export or back up data and access the support page for the app.
+
+## Premium Features
+
+Premium features will include an AI-powered chatbot, built with a privacy-first approach so user data is handled carefully and only when needed.
 
 ## Getting Started
 
@@ -34,7 +41,7 @@ Finbo is an intelligent financial assistant designed to help users manage their 
 
 Start the application:
 ```bash
-npm start
+npm run dev
 ```
 
 The application will be available at `http://localhost:3000`.
@@ -50,8 +57,7 @@ npm test
 
 ### Code Style
 
-We use Prettier for code formatting. To format your code:
+The project uses ESLint for code quality checks:
 ```bash
-npm run format
+npm run lint
 ```
-
