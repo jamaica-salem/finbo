@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Account, Transaction, Loan, LoanPayment, Bill, BillInstance } from '@/types/finance';
+import type { Account, Transaction, Loan, LoanPayment, Bill, BillInstance, CreditCard, CreditCardActivity } from '@/types/finance';
 
 // Generate a simple ID
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -32,6 +32,47 @@ const initialLoans: Loan[] = [
   { id: 'l3', name: 'Home Renovation', totalAmount: 15000, paidAmount: 3000, monthlyPayment: 500, interestRate: 3.2, startDate: '2024-06-01', dueDate: '2027-06-01', type: 'loan' },
 ];
 
+const initialCreditCards: CreditCard[] = [
+  {
+    id: 'cc1',
+    name: 'Everyday Visa',
+    issuer: 'Finbo Bank',
+    network: 'visa',
+    creditLimit: 50000,
+    currentBalance: 12480,
+    statementBalance: 12480,
+    minimumPayment: 400,
+    apr: 24.9,
+    rewardsRate: 1.5,
+    annualFee: 0,
+    dueDate: '2026-04-20',
+    statementCloseDate: '2026-04-15',
+    openedDate: '2023-03-01',
+    autopay: true,
+    rewardsPoints: 18720,
+  },
+  {
+    id: 'cc2',
+    name: 'Travel Mastercard',
+    issuer: 'Metro Card',
+    network: 'mastercard',
+    creditLimit: 120000,
+    currentBalance: 28150,
+    statementBalance: 28150,
+    minimumPayment: 900,
+    apr: 20.5,
+    rewardsRate: 2.0,
+    annualFee: 2500,
+    dueDate: '2026-04-24',
+    statementCloseDate: '2026-04-18',
+    openedDate: '2022-11-12',
+    autopay: false,
+    rewardsPoints: 46600,
+  },
+];
+
+const initialCreditCardActivities: CreditCardActivity[] = [];
+
 const initialBills: Bill[] = [
   { id: 'b1', name: 'Netflix', amount: 15.99, category: 'Entertainment', dueDay: 15, recurring: true, status: 'paid', paidDate: `${thisYear}-${String(thisMonth + 1).padStart(2, '0')}-15` },
   { id: 'b2', name: 'Electric Bill', amount: 85, category: 'Utilities', dueDay: 5, recurring: true, status: 'paid' },
@@ -46,6 +87,8 @@ interface FinanceState {
   transactions: Transaction[];
   loans: Loan[];
   loanPayments: LoanPayment[];
+  creditCards: CreditCard[];
+  creditCardActivities: CreditCardActivity[];
   bills: Bill[];
   currency: string;
   
@@ -63,6 +106,13 @@ interface FinanceState {
   updateLoan: (id: string, data: Partial<Loan>) => void;
   deleteLoan: (id: string) => void;
   logLoanPayment: (loanId: string, amount: number, note?: string) => void;
+
+  // Credit card actions
+  addCreditCard: (card: Omit<CreditCard, 'id'>) => void;
+  updateCreditCard: (id: string, data: Partial<CreditCard>) => void;
+  deleteCreditCard: (id: string) => void;
+  logCreditCardPayment: (cardId: string, amount: number, note?: string) => void;
+  logCreditCardPurchase: (cardId: string, amount: number, note?: string) => void;
   
   // Bill actions
   addBill: (bill: Omit<Bill, 'id'>) => void;
@@ -82,6 +132,8 @@ export const useFinanceStore = create<FinanceState>()(
   transactions: initialTransactions,
   loans: initialLoans,
   loanPayments: [],
+  creditCards: initialCreditCards,
+  creditCardActivities: initialCreditCardActivities,
   bills: initialBills,
   currency: '₱',
 
@@ -118,6 +170,60 @@ export const useFinanceStore = create<FinanceState>()(
     const payment: LoanPayment = { id: uid(), loanId, amount, date: new Date().toISOString().split('T')[0], note };
     const loans = s.loans.map((l) => l.id === loanId ? { ...l, paidAmount: l.paidAmount + amount } : l);
     return { loanPayments: [...s.loanPayments, payment], loans };
+  }),
+
+  addCreditCard: (card) => set((s) => ({ creditCards: [...s.creditCards, { ...card, id: uid() }] })),
+  updateCreditCard: (id, data) => set((s) => ({
+    creditCards: s.creditCards.map((card) => (card.id === id ? { ...card, ...data } : card)),
+  })),
+  deleteCreditCard: (id) => set((s) => ({
+    creditCards: s.creditCards.filter((card) => card.id !== id),
+    creditCardActivities: s.creditCardActivities.filter((activity) => activity.cardId !== id),
+  })),
+  logCreditCardPayment: (cardId, amount, note) => set((s) => {
+    const paymentAmount = Math.max(0, amount);
+    const payment: CreditCardActivity = {
+      id: uid(),
+      cardId,
+      type: 'payment',
+      amount: paymentAmount,
+      date: new Date().toISOString().split('T')[0],
+      note,
+    };
+    const creditCards = s.creditCards.map((card) => {
+      if (card.id !== cardId) return card;
+      const applied = Math.min(paymentAmount, card.currentBalance);
+      return {
+        ...card,
+        currentBalance: Math.max(0, card.currentBalance - applied),
+        statementBalance: Math.max(0, card.statementBalance - applied),
+        rewardsPoints: card.rewardsPoints,
+        openedDate: card.openedDate,
+        lastPaymentDate: payment.date,
+      };
+    });
+    return { creditCards, creditCardActivities: [payment, ...s.creditCardActivities] };
+  }),
+  logCreditCardPurchase: (cardId, amount, note) => set((s) => {
+    const purchaseAmount = Math.max(0, amount);
+    const activity: CreditCardActivity = {
+      id: uid(),
+      cardId,
+      type: 'purchase',
+      amount: purchaseAmount,
+      date: new Date().toISOString().split('T')[0],
+      note,
+    };
+    const creditCards = s.creditCards.map((card) => {
+      if (card.id !== cardId) return card;
+      return {
+        ...card,
+        currentBalance: card.currentBalance + purchaseAmount,
+        statementBalance: card.statementBalance + purchaseAmount,
+        rewardsPoints: card.rewardsPoints + Math.round(purchaseAmount * card.rewardsRate),
+      };
+    });
+    return { creditCards, creditCardActivities: [activity, ...s.creditCardActivities] };
   }),
 
   addBill: (bill) => set((s) => ({ bills: [...s.bills, { ...bill, id: uid() }] })),

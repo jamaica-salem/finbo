@@ -39,6 +39,37 @@ export interface LoanPayment {
   note?: string;
 }
 
+export type CreditCardNetwork = 'visa' | 'mastercard' | 'amex' | 'discover' | 'jcb' | 'unionpay' | 'other';
+
+export interface CreditCard {
+  id: string;
+  name: string;
+  issuer: string;
+  network: CreditCardNetwork;
+  creditLimit: number;
+  currentBalance: number;
+  statementBalance: number;
+  minimumPayment: number;
+  apr: number;
+  rewardsRate: number;
+  annualFee: number;
+  dueDate: string;
+  statementCloseDate: string;
+  openedDate: string;
+  autopay: boolean;
+  rewardsPoints: number;
+  lastPaymentDate?: string;
+}
+
+export interface CreditCardActivity {
+  id: string;
+  cardId: string;
+  type: 'payment' | 'purchase';
+  amount: number;
+  date: string;
+  note?: string;
+}
+
 export type BillStatus = 'paid' | 'pending' | 'overdue';
 
 export interface Bill {
