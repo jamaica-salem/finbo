@@ -19,16 +19,17 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
 
   return (
     <aside
+      style={{ transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
       className={cn(
-        'fixed left-0 top-0 bottom-0 z-30 flex flex-col border-r border-border bg-card transition-[width] duration-300 ease-in-out overflow-hidden',
+        'fixed left-0 top-0 bottom-0 z-30 flex flex-col overflow-hidden border-r border-border bg-card transition-[width] duration-500',
         collapsed ? 'w-20' : 'w-64',
       )}
     >
-      <div className={cn('flex items-center gap-3 px-3 py-4', collapsed ? 'justify-center' : 'justify-between')}>
+      <div className={cn('flex items-center gap-3 px-3 py-4 transition-all duration-300 ease-in-out', collapsed ? 'justify-center' : 'justify-between')}>
         <div className="flex items-center gap-2">
           <img src="/favicon.ico" alt="Finbo Logo" className="h-10 w-10 rounded-xl" />
           {!collapsed && (
-            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground">
+            <h1 className="font-heading text-xl font-bold tracking-tight text-foreground transition-all duration-200 ease-in-out">
               <span className="text-primary">Fin</span>bo
             </h1>
           )}
@@ -45,7 +46,7 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
             aria-label={label}
             className={({ isActive }) =>
               cn(
-                'group flex h-11 items-center rounded-xl text-sm font-medium transition-colors',
+                'group flex h-11 items-center rounded-xl text-sm font-medium transition-all duration-300 ease-in-out',
                 collapsed ? 'justify-center px-0' : 'gap-3 px-3',
                 isActive
                   ? 'bg-primary/10 text-primary'
@@ -53,13 +54,13 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
               )
             }
           >
-            <span className="flex w-5 shrink-0 items-center justify-center">
+            <span className="flex w-5 shrink-0 items-center justify-center transition-all duration-300 ease-in-out">
               <Icon className="h-4 w-4" />
             </span>
             <span
               className={cn(
-                'truncate transition-[max-width,opacity] duration-200 ease-in-out',
-                collapsed ? 'max-w-0 opacity-0' : 'max-w-[10rem] opacity-100',
+                'truncate overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-300 ease-in-out',
+                collapsed ? 'max-w-0 -translate-x-1 opacity-0' : 'max-w-[10rem] translate-x-0 opacity-100',
               )}
             >
               {label}
@@ -67,10 +68,10 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
           </RouterNavLink>
         ))}
       </nav>
-      <div className={cn('px-3 pb-4 pt-3', collapsed ? 'space-y-3' : 'space-y-4')}>
+      <div className="px-3 pb-6 pt-4">
         {!collapsed && (
           <div className="space-y-3">
-            <div className="rounded-lg bg-accent/50 border border-border p-3">
+            <div className="rounded-lg border border-border bg-accent/50 p-3 transition-all duration-300 ease-in-out">
               <p className="text-xs font-medium text-accent-foreground">Currency</p>
               <Select value={currency} onValueChange={setCurrency}>
                 <SelectTrigger className="mt-2 h-8 text-xs">
@@ -85,17 +86,17 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
                 </SelectContent>
               </Select>
             </div>
-            <div className="rounded-lg bg-accent/50 border border-border p-3">
+            <div className="rounded-lg border border-border bg-accent/50 p-3 transition-all duration-300 ease-in-out">
               <p className="text-xs font-medium text-accent-foreground">Pro Tip</p>
               <p className="text-xs text-muted-foreground mt-1">Track every expense to build better habits.</p>
             </div>
           </div>
         )}
-        <div className={cn('flex items-center gap-2', collapsed ? 'justify-center' : 'justify-end mt-1')}>
+        <div className={cn('flex items-center gap-2 transition-all duration-300 ease-in-out', collapsed ? 'justify-center mt-8' : 'justify-end mt-8')}>
           <button
             onClick={() => setCollapsed(!collapsed)}
             className={cn(
-              'flex items-center gap-2 rounded-lg text-muted-foreground transition-colors',
+              'flex items-center gap-2 rounded-lg text-muted-foreground transition-all duration-300 ease-in-out',
               collapsed ? 'h-10 w-10 justify-center hover:bg-muted hover:text-foreground' : 'px-3 py-2 hover:bg-muted hover:text-foreground',
             )}
             aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
