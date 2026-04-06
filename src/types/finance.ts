@@ -23,7 +23,7 @@ export interface Transaction {
   scheduledDate?: string;
 }
 
-export type RecurringTransactionFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly' | 'custom';
+export type RecurringTransactionFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'custom';
 
 export interface RecurringTransactionRule {
   id: string;

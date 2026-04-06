@@ -90,6 +90,8 @@ const nextRecurringDate = (date: Date, frequency: RecurringTransactionFrequency,
       return addDays(date, 1);
     case 'weekly':
       return addWeeks(date, 1);
+    case 'biweekly':
+      return addWeeks(date, 2);
     case 'monthly':
       return addMonths(date, 1);
     case 'yearly':

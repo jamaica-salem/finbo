@@ -36,6 +36,7 @@ export default function AccountsPage() {
   const [showAddTx, setShowAddTx] = useState(false);
   const [editTxId, setEditTxId] = useState<string | null>(null);
   const [showRecurring, setShowRecurring] = useState(false);
+  const [editRecurringId, setEditRecurringId] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<
     | { type: 'account'; id: string; label: string }
@@ -89,16 +90,34 @@ export default function AccountsPage() {
   const [ruleEndDate, setRuleEndDate] = useState('');
   const [ruleActive, setRuleActive] = useState(true);
 
+  // Edit recurring rule
+  const [editRuleLabel, setEditRuleLabel] = useState('');
+  const [editRuleAccountId, setEditRuleAccountId] = useState(accounts[0]?.id ?? '');
+  const [editRuleType, setEditRuleType] = useState<'income' | 'expense'>('expense');
+  const [editRuleAmount, setEditRuleAmount] = useState('0');
+  const [editRuleCategory, setEditRuleCategory] = useState('');
+  const [editRuleDescription, setEditRuleDescription] = useState('');
+  const [editRuleFrequency, setEditRuleFrequency] = useState<RecurringTransactionFrequency>('monthly');
+  const [editRuleIntervalDays, setEditRuleIntervalDays] = useState('30');
+  const [editRuleStartDate, setEditRuleStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [editRuleNextRunDate, setEditRuleNextRunDate] = useState(new Date().toISOString().split('T')[0]);
+  const [editRuleEndDate, setEditRuleEndDate] = useState('');
+  const [editRuleActive, setEditRuleActive] = useState(true);
+
   useEffect(() => {
     if (!accounts.length) {
       setRuleAccountId('');
+      setEditRuleAccountId('');
       return;
     }
 
     if (!accounts.some((account) => account.id === ruleAccountId)) {
       setRuleAccountId(accounts[0].id);
     }
-  }, [accounts, ruleAccountId]);
+    if (!accounts.some((account) => account.id === editRuleAccountId)) {
+      setEditRuleAccountId(accounts[0].id);
+    }
+  }, [accounts, editRuleAccountId, ruleAccountId]);
 
   const handleAddAccount = () => {
     if (!aName) return;
@@ -220,6 +239,46 @@ export default function AccountsPage() {
     setShowRecurring(false);
   };
 
+  const openEditRecurringRule = (ruleId: string) => {
+    const rule = recurringTransactionRules.find((item) => item.id === ruleId);
+    if (!rule) return;
+
+    setEditRecurringId(ruleId);
+    setEditRuleLabel(rule.label);
+    setEditRuleAccountId(rule.accountId);
+    setEditRuleType(rule.type);
+    setEditRuleAmount(String(rule.amount));
+    setEditRuleCategory(rule.category);
+    setEditRuleDescription(rule.description);
+    setEditRuleFrequency(rule.frequency);
+    setEditRuleIntervalDays(String(rule.intervalDays ?? 30));
+    setEditRuleStartDate(rule.startDate);
+    setEditRuleNextRunDate(rule.nextRunDate);
+    setEditRuleEndDate(rule.endDate ?? '');
+    setEditRuleActive(rule.active);
+  };
+
+  const handleEditRecurringRule = () => {
+    if (!editRecurringId || !editRuleLabel.trim() || !editRuleAccountId || !editRuleAmount || !editRuleCategory) return;
+
+    updateRecurringTransactionRule(editRecurringId, {
+      label: editRuleLabel.trim(),
+      accountId: editRuleAccountId,
+      type: editRuleType,
+      amount: parseFloat(editRuleAmount) || 0,
+      category: editRuleCategory,
+      description: editRuleDescription.trim(),
+      frequency: editRuleFrequency,
+      intervalDays: editRuleFrequency === 'custom' ? Math.max(1, parseInt(editRuleIntervalDays, 10) || 1) : undefined,
+      startDate: editRuleStartDate,
+      nextRunDate: editRuleNextRunDate || editRuleStartDate,
+      endDate: editRuleEndDate || undefined,
+      active: editRuleActive,
+    });
+
+    setEditRecurringId(null);
+  };
+
   const filteredTx = selectedAccount
     ? transactions.filter((t) => t.accountId === selectedAccount)
     : transactions;
@@ -299,6 +358,7 @@ export default function AccountsPage() {
                       <SelectContent>
                         <SelectItem value="daily">Daily</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-weekly</SelectItem>
                         <SelectItem value="monthly">Monthly</SelectItem>
                         <SelectItem value="yearly">Yearly</SelectItem>
                         <SelectItem value="custom">Custom</SelectItem>
@@ -521,6 +581,102 @@ export default function AccountsPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!editRecurringId} onOpenChange={() => setEditRecurringId(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle>Edit Recurring Rule</DialogTitle></DialogHeader>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-1.5 md:col-span-2">
+              <Label>Rule label</Label>
+              <Input placeholder="e.g. Monthly salary" value={editRuleLabel} onChange={(e) => setEditRuleLabel(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Account</Label>
+              <Select value={editRuleAccountId} onValueChange={setEditRuleAccountId} disabled={!accounts.length}>
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={editRuleType} onValueChange={(v) => setEditRuleType(v as 'income' | 'expense')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="income">Income</SelectItem>
+                  <SelectItem value="expense">Expense</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Amount</Label>
+              <Input type="number" min="0" step="0.01" value={editRuleAmount} onChange={(e) => setEditRuleAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={editRuleCategory} onValueChange={setEditRuleCategory}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
+              <Label>Description</Label>
+              <Input placeholder="e.g. Monthly payroll" value={editRuleDescription} onChange={(e) => setEditRuleDescription(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Frequency</Label>
+              <Select value={editRuleFrequency} onValueChange={(v) => setEditRuleFrequency(v as RecurringTransactionFrequency)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="daily">Daily</SelectItem>
+                  <SelectItem value="weekly">Weekly</SelectItem>
+                  <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                  <SelectItem value="monthly">Monthly</SelectItem>
+                  <SelectItem value="yearly">Yearly</SelectItem>
+                  <SelectItem value="custom">Custom</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Next run date</Label>
+              <Input type="date" value={editRuleNextRunDate} onChange={(e) => setEditRuleNextRunDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Start date</Label>
+              <Input type="date" value={editRuleStartDate} onChange={(e) => setEditRuleStartDate(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>End date</Label>
+              <Input type="date" value={editRuleEndDate} onChange={(e) => setEditRuleEndDate(e.target.value)} />
+            </div>
+            {editRuleFrequency === 'custom' && (
+              <div className="space-y-1.5 md:col-span-2">
+                <Label>Custom interval in days</Label>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={editRuleIntervalDays}
+                  onChange={(e) => setEditRuleIntervalDays(e.target.value)}
+                />
+              </div>
+            )}
+            <div className="flex items-center justify-between rounded-xl border border-border/70 px-3 py-2 md:col-span-2">
+              <div>
+                <p className="text-sm font-medium text-foreground">Active</p>
+                <p className="text-xs text-muted-foreground">Run automatically on due dates</p>
+              </div>
+              <Switch checked={editRuleActive} onCheckedChange={setEditRuleActive} />
+            </div>
+            <Button className="md:col-span-2" onClick={handleEditRecurringRule} disabled={!accounts.length}>
+              Save recurring rule
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="glass-card rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -550,7 +706,8 @@ export default function AccountsPage() {
                         {rule.category} · {rule.description || 'No description'}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Next run: {rule.nextRunDate} · {rule.frequency}{rule.frequency === 'custom' && rule.intervalDays ? ` every ${rule.intervalDays} days` : ''}
+                        Next run: {rule.nextRunDate} · {rule.frequency}
+                        {rule.frequency === 'custom' && rule.intervalDays ? ` every ${rule.intervalDays} days` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -561,6 +718,14 @@ export default function AccountsPage() {
                           onCheckedChange={(checked) => updateRecurringTransactionRule(rule.id, { active: checked })}
                         />
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        onClick={() => openEditRecurringRule(rule.id)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
