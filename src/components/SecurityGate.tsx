@@ -18,37 +18,25 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { clearFinboDeviceData, createPinRecord, isValidPin, verifyPin } from '@/lib/security';
+import { clearFinboDeviceData, isValidPin, verifyPin } from '@/lib/security';
 import { DEFAULT_AUTO_LOCK_MINUTES, useSecurityStore } from '@/store/securityStore';
 
-type PinMode = 'unlock' | 'setup';
-
 function PinEntryScreen({
-  mode,
   isSubmitting,
   onSubmit,
   onReset,
 }: {
-  mode: PinMode;
   isSubmitting: boolean;
-  onSubmit: (values: { pin: string; confirmPin?: string }) => Promise<void>;
+  onSubmit: (values: { pin: string }) => Promise<void>;
   onReset: () => void;
 }) {
   const [pin, setPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     setPin('');
-    setConfirmPin('');
     setError(null);
-  }, [mode]);
-
-  const title = mode === 'setup' ? 'Set a device PIN' : 'Unlock Finbo';
-  const description =
-    mode === 'setup'
-      ? 'Create a 4-6 digit PIN to protect this browser and device.'
-      : 'Enter your 4-6 digit PIN to view your financial data.';
+  }, []);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -58,17 +46,11 @@ function PinEntryScreen({
       return;
     }
 
-    if (mode === 'setup' && pin !== confirmPin) {
-      setError('PIN confirmation does not match.');
-      return;
-    }
-
     setError(null);
 
     try {
-      await onSubmit({ pin, confirmPin });
+      await onSubmit({ pin });
       setPin('');
-      setConfirmPin('');
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : 'Something went wrong.');
     }
@@ -81,14 +63,14 @@ function PinEntryScreen({
           <CardHeader className="space-y-4 text-center">
             <img src="/favicon.ico" alt="Finbo Logo" className="mx-auto h-16 w-16 rounded-2xl shadow-sm" />
             <div className="space-y-2">
-              <CardTitle className="text-2xl">{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
+              <CardTitle className="text-2xl">Unlock Finbo</CardTitle>
+              <CardDescription>Enter your 4-6 digit PIN to view your financial data.</CardDescription>
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
-                <Label htmlFor="pin">{mode === 'setup' ? 'Create PIN' : 'PIN'}</Label>
+                <Label htmlFor="pin">PIN</Label>
                 <Input
                   id="pin"
                   value={pin}
@@ -98,25 +80,9 @@ function PinEntryScreen({
                   placeholder="Enter 4-6 digits"
                   type="password"
                   maxLength={6}
-                  autoComplete={mode === 'setup' ? 'new-password' : 'current-password'}
+                  autoComplete="current-password"
                 />
               </div>
-              {mode === 'setup' && (
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-pin">Confirm PIN</Label>
-                  <Input
-                    id="confirm-pin"
-                    value={confirmPin}
-                    onChange={(event) => setConfirmPin(event.target.value)}
-                    inputMode="numeric"
-                    pattern="\d*"
-                    placeholder="Re-enter PIN"
-                    type="password"
-                    maxLength={6}
-                    autoComplete="new-password"
-                  />
-                </div>
-              )}
               {error && (
                 <p className="text-sm text-destructive" role="alert">
                   {error}
@@ -126,10 +92,10 @@ function PinEntryScreen({
                 {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    {mode === 'setup' ? 'Saving PIN' : 'Checking PIN'}
+                    Unlocking
                   </>
                 ) : (
-                  mode === 'setup' ? 'Set PIN and unlock' : 'Unlock'
+                  'Unlock'
                 )}
               </Button>
             </form>
@@ -178,11 +144,13 @@ function PinEntryScreen({
 }
 
 export function SecurityGate({ children }: { children: ReactNode }) {
-  const { pinHash, pinSalt, autoLockMinutes, hydrated, setPinRecord } = useSecurityStore();
+  const { pinHash, pinSalt, autoLockMinutes, hydrated } = useSecurityStore();
   const [locked, setLocked] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const initializedRef = useRef(false);
   const timeoutRef = useRef<number | null>(null);
-  const mode: PinMode = pinHash && pinSalt ? 'unlock' : 'setup';
+  const hasPin = Boolean(pinHash && pinSalt);
+  const lockEnabled = hasPin;
 
   const timeoutMs = useMemo(
     () => Math.max(1, autoLockMinutes || DEFAULT_AUTO_LOCK_MINUTES) * 60 * 1000,
@@ -207,12 +175,13 @@ export function SecurityGate({ children }: { children: ReactNode }) {
   }, [clearAutoLockTimer]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    setLocked(true);
-  }, [hydrated]);
+    if (!hydrated || initializedRef.current) return;
+    initializedRef.current = true;
+    setLocked(hasPin);
+  }, [hasPin, hydrated]);
 
   useEffect(() => {
-    if (!hydrated || locked || !pinHash || !pinSalt) {
+    if (!hydrated || locked || !lockEnabled || !pinHash || !pinSalt) {
       clearAutoLockTimer();
       return;
     }
@@ -257,23 +226,15 @@ export function SecurityGate({ children }: { children: ReactNode }) {
       window.removeEventListener('blur', handleVisibility);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [clearAutoLockTimer, hydrated, lock, locked, pinHash, pinSalt, timeoutMs]);
+  }, [clearAutoLockTimer, hydrated, lock, lockEnabled, locked, pinHash, pinSalt, timeoutMs]);
 
-  const handleSubmit = async ({ pin }: { pin: string; confirmPin?: string }) => {
+  const handleSubmit = async ({ pin }: { pin: string }) => {
     if (!isValidPin(pin)) {
       throw new Error('PIN must be 4 to 6 digits.');
     }
 
     setIsSubmitting(true);
     try {
-      if (mode === 'setup') {
-        const { hash, salt } = await createPinRecord(pin);
-        setPinRecord(hash, salt);
-        toast.success('PIN saved.');
-        unlock();
-        return;
-      }
-
       if (!pinHash || !pinSalt) {
         throw new Error('No PIN is set on this device.');
       }
@@ -306,8 +267,8 @@ export function SecurityGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (locked || mode === 'setup') {
-    return <PinEntryScreen mode={mode} isSubmitting={isSubmitting} onSubmit={handleSubmit} onReset={handleReset} />;
+  if (lockEnabled && locked) {
+    return <PinEntryScreen isSubmitting={isSubmitting} onSubmit={handleSubmit} onReset={handleReset} />;
   }
 
   return <>{children}</>;

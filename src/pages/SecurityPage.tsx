@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Shield, KeyRound, Clock3, TriangleAlert, RotateCcw, CheckCircle2 } from 'lucide-react';
+import { KeyRound, Clock3, TriangleAlert, RotateCcw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ export default function SecurityPage() {
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isSavingPin, setIsSavingPin] = useState(false);
+  const hasPin = Boolean(pinHash && pinSalt);
 
   const autoLockLabel = useMemo(() => {
     if (autoLockMinutes === DEFAULT_AUTO_LOCK_MINUTES) return '15 minutes';
@@ -26,16 +27,6 @@ export default function SecurityPage() {
   }, [autoLockMinutes]);
 
   const handleChangePin = async () => {
-    if (!pinHash || !pinSalt) {
-      toast.error('No PIN is currently set.');
-      return;
-    }
-
-    if (!isValidPin(currentPin)) {
-      toast.error('Current PIN must be 4 to 6 digits.');
-      return;
-    }
-
     if (!isValidPin(newPin)) {
       toast.error('New PIN must be 4 to 6 digits.');
       return;
@@ -48,10 +39,22 @@ export default function SecurityPage() {
 
     setIsSavingPin(true);
     try {
-      const valid = await verifyPin(currentPin, pinSalt, pinHash);
-      if (!valid) {
-        toast.error('Current PIN is incorrect.');
-        return;
+      if (hasPin) {
+        if (!isValidPin(currentPin)) {
+          toast.error('Current PIN must be 4 to 6 digits.');
+          return;
+        }
+
+        if (!pinHash || !pinSalt) {
+          toast.error('No PIN is currently set.');
+          return;
+        }
+
+        const valid = await verifyPin(currentPin, pinSalt, pinHash);
+        if (!valid) {
+          toast.error('Current PIN is incorrect.');
+          return;
+        }
       }
 
       const { hash, salt } = await createPinRecord(newPin);
@@ -73,14 +76,9 @@ export default function SecurityPage() {
   return (
     <div className="space-y-8">
       <div className="space-y-2">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Shield className="h-6 w-6" />
-          </div>
-          <div>
-            <h1 className="font-heading text-3xl font-bold tracking-tight">Security</h1>
-            <p className="text-muted-foreground">Manage your local PIN and auto-lock behavior.</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-heading font-bold text-foreground">Security</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage your local PIN and auto-lock behavior.</p>
         </div>
       </div>
 
@@ -97,31 +95,45 @@ export default function SecurityPage() {
         </AlertDescription>
       </Alert>
 
+      {!hasPin && (
+        <Alert className="border-primary/30 bg-primary/10">
+          <AlertTitle>PIN is optional</AlertTitle>
+          <AlertDescription>
+            You can keep using Finbo normally without a PIN. Set one here any time for extra protection on this
+            browser.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <KeyRound className="h-5 w-5 text-primary" />
-              Change PIN
+              {hasPin ? 'Change PIN' : 'Set PIN'}
             </CardTitle>
-            <CardDescription>Update the PIN on this browser and device.</CardDescription>
+            <CardDescription>
+              {hasPin ? 'Update the PIN on this browser and device.' : 'Protect this browser and device with a PIN.'}
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {hasPin && (
+              <div className="space-y-2">
+                <Label htmlFor="current-pin">Current PIN</Label>
+                <Input
+                  id="current-pin"
+                  value={currentPin}
+                  onChange={(event) => setCurrentPin(event.target.value)}
+                  inputMode="numeric"
+                  pattern="\d*"
+                  placeholder="Enter current PIN"
+                  type="password"
+                  maxLength={6}
+                />
+              </div>
+            )}
             <div className="space-y-2">
-              <Label htmlFor="current-pin">Current PIN</Label>
-              <Input
-                id="current-pin"
-                value={currentPin}
-                onChange={(event) => setCurrentPin(event.target.value)}
-                inputMode="numeric"
-                pattern="\d*"
-                placeholder="Enter current PIN"
-                type="password"
-                maxLength={6}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-pin">New PIN</Label>
+              <Label htmlFor="new-pin">{hasPin ? 'New PIN' : 'Create PIN'}</Label>
               <Input
                 id="new-pin"
                 value={newPin}
@@ -147,7 +159,7 @@ export default function SecurityPage() {
               />
             </div>
             <Button onClick={handleChangePin} disabled={isSavingPin} className="w-full">
-              {isSavingPin ? 'Saving PIN...' : 'Save new PIN'}
+              {isSavingPin ? 'Saving PIN...' : hasPin ? 'Save new PIN' : 'Set PIN'}
             </Button>
           </CardContent>
         </Card>

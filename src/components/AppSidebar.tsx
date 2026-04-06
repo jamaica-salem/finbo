@@ -11,7 +11,6 @@ const navItems = [
   { to: '/loans', label: 'Loans', icon: TrendingDown },
   { to: '/credits', label: 'Credits', icon: CreditCard },
   { to: '/savings', label: 'Savings', icon: PiggyBank },
-  { to: '/security', label: 'Security', icon: Shield },
   { to: '/bills', label: 'Bills', icon: Receipt },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
@@ -71,6 +70,50 @@ export function AppSidebar({ collapsed, setCollapsed }: { collapsed: boolean; se
         ))}
       </nav>
       <div className="px-3 pb-6 pt-4">
+        <div className="mb-4">
+          {!collapsed ? (
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">App settings</p>
+              <RouterNavLink
+                to="/security"
+                title="Security"
+                aria-label="Security"
+                className={({ isActive }) =>
+                  cn(
+                    'group flex h-11 items-center rounded-xl text-sm font-medium transition-all duration-300 ease-in-out',
+                    collapsed ? 'justify-center px-0' : 'gap-3 px-3',
+                    isActive
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )
+                }
+              >
+                <span className="flex w-5 shrink-0 items-center justify-center transition-all duration-300 ease-in-out">
+                  <Shield className="h-4 w-4" />
+                </span>
+                <span className="truncate overflow-hidden whitespace-nowrap max-w-[10rem] translate-x-0 opacity-100">
+                  Security
+                </span>
+              </RouterNavLink>
+            </div>
+          ) : (
+            <RouterNavLink
+              to="/security"
+              title="Security"
+              aria-label="Security"
+              className={({ isActive }) =>
+                cn(
+                  'group flex h-11 items-center justify-center rounded-xl text-sm font-medium transition-all duration-300 ease-in-out',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )
+              }
+            >
+              <Shield className="h-4 w-4" />
+            </RouterNavLink>
+          )}
+        </div>
         {!collapsed && (
           <div className="space-y-3">
             <div className="rounded-lg border border-border bg-accent/50 p-3 transition-all duration-300 ease-in-out">
