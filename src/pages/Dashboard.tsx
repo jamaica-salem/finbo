@@ -1,6 +1,6 @@
 import { useFinanceStore } from '@/store/financeStore';
 import { StatCard } from '@/components/StatCard';
-import { DollarSign, Receipt, TrendingUp, CreditCard, CalendarClock } from 'lucide-react';
+import { PhilippinePeso, Receipt, TrendingUp, CreditCard, CalendarClock } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -76,7 +76,7 @@ export default function Dashboard() {
           title="Total Balance"
           value={`${currency}${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
           trend={{ value: '3.2% vs last month', positive: true }}
-          icon={<DollarSign className="h-5 w-5" />}
+          icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
           title="Monthly Bills"
