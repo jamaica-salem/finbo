@@ -131,7 +131,9 @@ function PinEntryScreen({
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={onReset}>Reset now</AlertDialogAction>
+                    <AlertDialogAction onClick={onReset} variant="destructive">
+                      Reset now
+                    </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
