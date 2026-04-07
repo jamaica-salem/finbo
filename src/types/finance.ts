@@ -12,7 +12,8 @@ export interface Account {
 export interface Transaction {
   id: string;
   accountId: string;
-  type: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer';
+  transferAccountId?: string;
   amount: number;
   category: string;
   categories?: string[];
@@ -137,6 +138,9 @@ export interface Bill {
   category: string;
   dueDate: string;
   recurring: boolean;
+  frequency?: RecurringTransactionFrequency;
+  intervalDays?: number;
+  active?: boolean;
   status: BillStatus;
   paidDate?: string;
 }
