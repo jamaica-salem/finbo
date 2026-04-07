@@ -58,6 +58,20 @@ export default function Dashboard() {
   const totalMonthlyPayments = totalBillsDue + totalLoanMonthlyPayments + totalInstallmentMonthlyPayments + totalCreditCardMinimumPayments + activeMonthlyRecurringExpenses;
   const totalDebts = totalLoanRemaining + totalInstallmentRemaining + totalCreditCardDebt;
   const netAfterDebts = totalBalance - totalDebts;
+  const nearNegativeNetThreshold = Math.max(1000, totalDebts * 0.1);
+  const isNetNegative = netAfterDebts < 0;
+  const isNetNearNegative = !isNetNegative && netAfterDebts <= nearNegativeNetThreshold;
+  const netCardClassName = isNetNegative
+    ? 'border-destructive/60 bg-destructive/10'
+    : isNetNearNegative
+      ? 'border-warning/60 bg-warning/10'
+      : undefined;
+  const netValueClassName = isNetNegative ? 'text-destructive' : isNetNearNegative ? 'text-warning' : undefined;
+  const netSubtitle = isNetNegative
+    ? 'Alert: total debts exceed total balance'
+    : isNetNearNegative
+      ? 'Warning: net is close to negative'
+      : 'Total balance - total debts';
   const totalLoansCount = loans.filter((l) => l.type === 'loan').length;
   const totalInstallmentsCount = loans.filter((l) => l.type === 'installment').length;
 
@@ -145,7 +159,9 @@ export default function Dashboard() {
         <StatCard
           title="Net"
           value={`${currency}${netAfterDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle="Total balance - total debts"
+          valueClassName={netValueClassName}
+          subtitle={netSubtitle}
+          className={netCardClassName}
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <StatCard
