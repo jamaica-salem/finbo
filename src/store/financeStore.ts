@@ -86,6 +86,27 @@ const ensureCategoryColors = (
   return nextColors;
 };
 
+const getTransactionAccountEffects = (transaction: Transaction) => {
+  const effects = new Map<string, number>();
+
+  if (transaction.type === 'income') {
+    effects.set(transaction.accountId, (effects.get(transaction.accountId) ?? 0) + transaction.amount);
+    return effects;
+  }
+
+  if (transaction.type === 'expense') {
+    effects.set(transaction.accountId, (effects.get(transaction.accountId) ?? 0) - transaction.amount);
+    return effects;
+  }
+
+  effects.set(transaction.accountId, (effects.get(transaction.accountId) ?? 0) - transaction.amount);
+  if (transaction.transferAccountId && transaction.transferAccountId !== transaction.accountId) {
+    effects.set(transaction.transferAccountId, (effects.get(transaction.transferAccountId) ?? 0) + transaction.amount);
+  }
+
+  return effects;
+};
+
 const nextRecurringDate = (date: Date, frequency: RecurringTransactionFrequency, intervalDays?: number) => {
   switch (frequency) {
     case 'daily':
@@ -116,6 +137,9 @@ const normalizeBill = (bill: Partial<Bill> & { dueDay?: unknown }): Bill => {
     category: bill.category ?? 'Other',
     dueDate: isIsoDate(bill.dueDate) ? bill.dueDate : fallbackDueDate,
     recurring: typeof bill.recurring === 'boolean' ? bill.recurring : true,
+    frequency: (bill as Partial<Bill>).frequency ?? 'monthly',
+    intervalDays: (bill as Partial<Bill>).intervalDays ?? undefined,
+    active: typeof (bill as Partial<Bill>).active === 'boolean' ? (bill as Partial<Bill>).active : true,
     status: bill.status === 'paid' || bill.status === 'pending' || bill.status === 'overdue' ? bill.status : 'pending',
     paidDate: isIsoDate(bill.paidDate) ? bill.paidDate : undefined,
   };
@@ -316,15 +340,22 @@ export const useFinanceStore = create<FinanceState>()(
 
       addTransaction: (tx) => set((s) => {
         const categories = splitList(tx.categories).length > 0 ? splitList(tx.categories) : [tx.category];
+        const transferAccountId = tx.type === 'transfer' ? tx.transferAccountId : undefined;
+        if (tx.type === 'transfer' && (!transferAccountId || transferAccountId === tx.accountId)) {
+          return s;
+        }
         const newTx = {
           ...tx,
           id: uid(),
+          transferAccountId,
           categories,
           tags: splitList(tx.tags),
         };
+        const accountEffects = getTransactionAccountEffects(newTx);
         const accounts = s.accounts.map((a) => {
-          if (a.id === tx.accountId) {
-            return { ...a, balance: tx.type === 'income' ? a.balance + tx.amount : a.balance - tx.amount };
+          const delta = accountEffects.get(a.id);
+          if (typeof delta === 'number' && delta !== 0) {
+            return { ...a, balance: a.balance + delta };
           }
           return a;
         });
@@ -337,6 +368,14 @@ export const useFinanceStore = create<FinanceState>()(
       updateTransaction: (id, data) => set((s) => {
         const existing = s.transactions.find((tx) => tx.id === id);
         if (!existing) return s;
+        const nextType = data.type || existing.type;
+        const nextTransferAccountId =
+          nextType === 'transfer'
+            ? data.transferAccountId ?? existing.transferAccountId
+            : undefined;
+        if (nextType === 'transfer' && (!nextTransferAccountId || nextTransferAccountId === (data.accountId || existing.accountId))) {
+          return s;
+        }
 
         const nextTransaction: Transaction = {
           ...existing,
@@ -348,33 +387,21 @@ export const useFinanceStore = create<FinanceState>()(
           tags: splitList(data.tags ?? existing.tags),
           amount: typeof data.amount === 'number' ? data.amount : existing.amount,
           accountId: data.accountId || existing.accountId,
-          type: data.type || existing.type,
+          transferAccountId: nextTransferAccountId,
+          type: nextType,
           description: data.description ?? existing.description,
           date: data.date ?? existing.date,
         };
-
-        const oldAccountId = existing.accountId;
-        const newAccountId = nextTransaction.accountId;
-        const oldEffect = existing.type === 'income' ? existing.amount : -existing.amount;
-        const newEffect = nextTransaction.type === 'income' ? nextTransaction.amount : -nextTransaction.amount;
+        const oldEffects = getTransactionAccountEffects(existing);
+        const newEffects = getTransactionAccountEffects(nextTransaction);
 
         const accounts = s.accounts.map((account) => {
-          if (account.id === oldAccountId && account.id === newAccountId) {
+          const oldDelta = oldEffects.get(account.id) ?? 0;
+          const newDelta = newEffects.get(account.id) ?? 0;
+          if (oldDelta !== 0 || newDelta !== 0) {
             return {
               ...account,
-              balance: account.balance - oldEffect + newEffect,
-            };
-          }
-          if (account.id === oldAccountId) {
-            return {
-              ...account,
-              balance: account.balance - oldEffect,
-            };
-          }
-          if (account.id === newAccountId) {
-            return {
-              ...account,
-              balance: account.balance + newEffect,
+              balance: account.balance - oldDelta + newDelta,
             };
           }
           return account;
@@ -390,9 +417,11 @@ export const useFinanceStore = create<FinanceState>()(
       deleteTransaction: (id) => set((s) => {
         const tx = s.transactions.find((t) => t.id === id);
         if (!tx) return s;
+        const accountEffects = getTransactionAccountEffects(tx);
         const accounts = s.accounts.map((a) => {
-          if (a.id === tx.accountId) {
-            return { ...a, balance: tx.type === 'income' ? a.balance - tx.amount : a.balance + tx.amount };
+          const delta = accountEffects.get(a.id);
+          if (typeof delta === 'number' && delta !== 0) {
+            return { ...a, balance: a.balance - delta };
           }
           return a;
         });
@@ -686,9 +715,42 @@ export const useFinanceStore = create<FinanceState>()(
       addBill: (bill) => set((s) => ({ bills: [...s.bills, { ...bill, id: uid() }] })),
       updateBill: (id, data) => set((s) => ({ bills: s.bills.map((b) => b.id === id ? { ...b, ...data } : b) })),
       deleteBill: (id) => set((s) => ({ bills: s.bills.filter((b) => b.id !== id) })),
-      markBillPaid: (id) => set((s) => ({
-        bills: s.bills.map((b) => b.id === id ? { ...b, status: 'paid' as const, paidDate: new Date().toISOString().split('T')[0] } : b),
-      })),
+      markBillPaid: (id) => set((s) => {
+        const paidDate = new Date().toISOString().split('T')[0];
+        const updated = s.bills.map((b) => (b.id === id ? { ...b, status: 'paid' as const, paidDate } : b));
+
+        const orig = s.bills.find((b) => b.id === id);
+        if (!orig) return { bills: updated };
+
+        // If the bill is recurring and active, create the next occurrence
+        if (orig.recurring && (orig as Partial<Bill>).active !== false) {
+          try {
+            const current = isIsoDate(orig.dueDate) ? toDate(orig.dueDate) : new Date();
+            const freq = (orig as Partial<Bill>).frequency ?? 'monthly';
+            const interval = (orig as Partial<Bill>).intervalDays ?? undefined;
+            const next = nextRecurringDate(current, freq, interval);
+            const nextDue = formatDate(next);
+            const newBill: Bill = {
+              id: uid(),
+              name: orig.name,
+              amount: orig.amount,
+              category: orig.category,
+              dueDate: nextDue,
+              recurring: true,
+              frequency: freq,
+              intervalDays: interval,
+              active: (orig as Partial<Bill>).active ?? true,
+              status: 'pending',
+            };
+
+            return { bills: [...updated, newBill] };
+          } catch (e) {
+            return { bills: updated };
+          }
+        }
+
+        return { bills: updated };
+      }),
       markBillUnpaid: (id) => set((s) => ({
         bills: s.bills.map((b) => b.id === id ? { ...b, status: 'pending' as const, paidDate: undefined } : b),
       })),
