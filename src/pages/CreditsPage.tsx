@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -90,6 +91,8 @@ export default function CreditsPage() {
   const [editOpenedDate, setEditOpenedDate] = useState('');
   const [editAutopay, setEditAutopay] = useState(false);
   const [editRewardsPoints, setEditRewardsPoints] = useState('0');
+  const [addErrors, setAddErrors] = useState<{ name?: string; issuer?: string; creditLimit?: string }>({});
+  const [editErrors, setEditErrors] = useState<{ name?: string; issuer?: string; creditLimit?: string }>({});
   const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
 
   const totalLimit = creditCards.reduce((sum, card) => sum + card.creditLimit, 0);
@@ -119,6 +122,7 @@ export default function CreditsPage() {
     setEditOpenedDate(card.openedDate);
     setEditAutopay(card.autopay);
     setEditRewardsPoints(String(card.rewardsPoints));
+    setEditErrors({});
   };
 
   const resetAddForm = () => {
@@ -137,10 +141,20 @@ export default function CreditsPage() {
     setStatementCloseDate('');
     setOpenedDate('');
     setAutopay(false);
+    setAddErrors({});
   };
 
   const handleAdd = () => {
-    if (!name || !issuer) return;
+    setAddErrors({});
+    const errors: typeof addErrors = {};
+    if (!name.trim()) errors.name = 'Name is required';
+    if (!issuer.trim()) errors.issuer = 'Issuer is required';
+    if (!(parseFloat(creditLimit) > 0)) errors.creditLimit = 'Credit limit must be greater than 0';
+    if (Object.keys(errors).length > 0) {
+      setAddErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     const limit = parseFloat(creditLimit) || 0;
     const paid = parseFloat(paidAmount) || 0;
@@ -148,8 +162,8 @@ export default function CreditsPage() {
     const statement = parseFloat(statementBalance) || 0;
 
     addCreditCard({
-      name,
-      issuer,
+      name: name.trim(),
+      issuer: issuer.trim(),
       network,
       creditLimit: limit,
       paidAmount: paid,
@@ -171,11 +185,21 @@ export default function CreditsPage() {
   };
 
   const handleEdit = () => {
-    if (!editId || !editName || !editIssuer) return;
+    setEditErrors({});
+    const errors: typeof editErrors = {};
+    if (!editId) return;
+    if (!editName.trim()) errors.name = 'Name is required';
+    if (!editIssuer.trim()) errors.issuer = 'Issuer is required';
+    if (!(parseFloat(editCreditLimit) > 0)) errors.creditLimit = 'Credit limit must be greater than 0';
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     updateCreditCard(editId, {
-      name: editName,
-      issuer: editIssuer,
+      name: editName.trim(),
+      issuer: editIssuer.trim(),
       network: editNetwork,
       creditLimit: parseFloat(editCreditLimit) || 0,
       paidAmount: parseFloat(editPaidAmount) || 0,
@@ -334,7 +358,13 @@ export default function CreditsPage() {
         title="Credits"
         description="Track credit cards, balances, payments, and rewards"
         actions={
-        <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <Dialog
+          open={showAdd}
+          onOpenChange={(open) => {
+            setShowAdd(open);
+            if (!open) setAddErrors({});
+          }}
+        >
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Card</Button>
           </DialogTrigger>
@@ -344,10 +374,12 @@ export default function CreditsPage() {
               <div className="space-y-1.5">
                 <Label>Name</Label>
                 <Input placeholder="e.g. Everyday Visa" value={name} onChange={(e) => setName(e.target.value)} />
+                {addErrors.name ? <p className="text-sm text-destructive">{addErrors.name}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Issuer</Label>
                 <Input placeholder="e.g. Finbo Bank" value={issuer} onChange={(e) => setIssuer(e.target.value)} />
+                {addErrors.issuer ? <p className="text-sm text-destructive">{addErrors.issuer}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Network</Label>
@@ -367,6 +399,7 @@ export default function CreditsPage() {
               <div className="space-y-1.5">
                 <Label>Credit limit</Label>
                 <Input placeholder="0.00" type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
+                {addErrors.creditLimit ? <p className="text-sm text-destructive">{addErrors.creditLimit}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Paid amount</Label>
@@ -482,17 +515,25 @@ export default function CreditsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editId} onOpenChange={() => setEditId(null)}>
+      <Dialog
+        open={!!editId}
+        onOpenChange={() => {
+          setEditId(null);
+          setEditErrors({});
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Edit Credit Card</DialogTitle></DialogHeader>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label>Name</Label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              {editErrors.name ? <p className="text-sm text-destructive">{editErrors.name}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Issuer</Label>
               <Input value={editIssuer} onChange={(e) => setEditIssuer(e.target.value)} />
+              {editErrors.issuer ? <p className="text-sm text-destructive">{editErrors.issuer}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Network</Label>
@@ -512,6 +553,7 @@ export default function CreditsPage() {
             <div className="space-y-1.5">
               <Label>Credit limit</Label>
               <Input type="number" value={editCreditLimit} onChange={(e) => setEditCreditLimit(e.target.value)} />
+              {editErrors.creditLimit ? <p className="text-sm text-destructive">{editErrors.creditLimit}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Paid amount</Label>
