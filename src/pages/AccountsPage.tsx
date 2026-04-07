@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -59,11 +60,13 @@ export default function AccountsPage() {
   const [editAName, setEditAName] = useState('');
   const [editAType, setEditAType] = useState<AccountType>('bank');
   const [editABal, setEditABal] = useState('0');
+  const [editAccountErrors, setEditAccountErrors] = useState<{ name?: string; balance?: string }>({});
 
   // Add account form
   const [aName, setAName] = useState('');
   const [aType, setAType] = useState<AccountType>('bank');
   const [aBal, setABal] = useState('0');
+  const [addAccountErrors, setAddAccountErrors] = useState<{ name?: string; balance?: string }>({});
 
   // Add transaction form
   const [txAccount, setTxAccount] = useState('');
@@ -86,6 +89,8 @@ export default function AccountsPage() {
   const [editTxTags, setEditTxTags] = useState('');
   const [editTxDesc, setEditTxDesc] = useState('');
   const [editTxDate, setEditTxDate] = useState(new Date().toISOString().split('T')[0]);
+  const [addTxErrors, setAddTxErrors] = useState<{ account?: string; transfer?: string; amount?: string; category?: string; date?: string }>({});
+  const [editTxErrors, setEditTxErrors] = useState<{ account?: string; transfer?: string; amount?: string; category?: string; date?: string }>({});
 
   // Recurring transaction rule
   const [ruleLabel, setRuleLabel] = useState('');
@@ -114,6 +119,8 @@ export default function AccountsPage() {
   const [editRuleNextRunDate, setEditRuleNextRunDate] = useState(new Date().toISOString().split('T')[0]);
   const [editRuleEndDate, setEditRuleEndDate] = useState('');
   const [editRuleActive, setEditRuleActive] = useState(true);
+  const [addRuleErrors, setAddRuleErrors] = useState<{ label?: string; account?: string; amount?: string; category?: string; startDate?: string; nextRunDate?: string; intervalDays?: string }>({});
+  const [editRuleErrors, setEditRuleErrors] = useState<{ label?: string; account?: string; amount?: string; category?: string; startDate?: string; nextRunDate?: string; intervalDays?: string }>({});
 
   useEffect(() => {
     if (!accounts.length) {
@@ -131,14 +138,27 @@ export default function AccountsPage() {
   }, [accounts, editRuleAccountId, ruleAccountId]);
 
   const handleAddAccount = () => {
-    if (!aName) return;
-    addAccount({ name: aName, type: aType, balance: parseFloat(aBal) || 0, currency, color: 'hsl(172, 66%, 40%)' });
-    setAName(''); setABal('0'); setShowAddAccount(false);
+    setAddAccountErrors({});
+    const errors: typeof addAccountErrors = {};
+    const balance = Number(aBal);
+    if (!aName.trim()) errors.name = 'Account name is required';
+    if (!Number.isFinite(balance) || balance < 0) errors.balance = 'Initial balance cannot be negative';
+    if (Object.keys(errors).length > 0) {
+      setAddAccountErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+    addAccount({ name: aName.trim(), type: aType, balance, currency, color: 'hsl(172, 66%, 40%)' });
+    setAName('');
+    setABal('0');
+    setAddAccountErrors({});
+    setShowAddAccount(false);
   };
 
   const openEditAccount = (id: string) => {
     const acc = accounts.find(a => a.id === id);
     if (!acc) return;
+    setEditAccountErrors({});
     setEditAccountId(id);
     setEditAName(acc.name);
     setEditAType(acc.type);
@@ -146,26 +166,49 @@ export default function AccountsPage() {
   };
 
   const handleEditAccount = () => {
-    if (!editAccountId || !editAName) return;
-    updateAccount(editAccountId, { name: editAName, type: editAType, balance: parseFloat(editABal) || 0 });
+    setEditAccountErrors({});
+    const errors: typeof editAccountErrors = {};
+    if (!editAccountId) return;
+    const balance = Number(editABal);
+    if (!editAName.trim()) errors.name = 'Account name is required';
+    if (!Number.isFinite(balance) || balance < 0) errors.balance = 'Balance cannot be negative';
+    if (Object.keys(errors).length > 0) {
+      setEditAccountErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+    updateAccount(editAccountId, { name: editAName.trim(), type: editAType, balance });
+    setEditAccountErrors({});
     setEditAccountId(null);
   };
 
   const handleAddTx = () => {
+    setAddTxErrors({});
+    const errors: typeof addTxErrors = {};
     const isTransfer = txType === 'transfer';
     const primaryCategory = isTransfer ? 'Transfer' : txCategory.trim() || txExtraCategory.trim();
     const extraCategory = txCategory.trim() && txExtraCategory.trim() && txExtraCategory.trim() !== txCategory.trim()
       ? txExtraCategory.trim()
       : '';
 
-    if (!txAccount || !txAmount || !primaryCategory) return;
-    if (isTransfer && (!txTransferAccount || txTransferAccount === txAccount)) return;
+    const amount = Number(txAmount);
+    if (!txAccount) errors.account = 'Account is required';
+    if (!Number.isFinite(amount) || amount <= 0) errors.amount = 'Amount must be greater than 0';
+    if (!primaryCategory) errors.category = 'Category is required';
+    if (!txDate) errors.date = 'Date is required';
+    if (isTransfer && !txTransferAccount) errors.transfer = 'Destination account is required';
+    if (isTransfer && txTransferAccount === txAccount) errors.transfer = 'Destination must be different from source account';
+    if (Object.keys(errors).length > 0) {
+      setAddTxErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     addTransaction({
       accountId: txAccount,
       type: txType,
       transferAccountId: isTransfer ? txTransferAccount : undefined,
-      amount: parseFloat(txAmount),
+      amount,
       category: primaryCategory,
       categories: isTransfer ? ['Transfer'] : [primaryCategory, extraCategory].filter(Boolean),
       tags: txTags.split(/[,\n;]/).map((item) => item.trim()).filter(Boolean),
@@ -177,12 +220,14 @@ export default function AccountsPage() {
     setTxTags('');
     setTxDesc('');
     setTxTransferAccount('');
+    setAddTxErrors({});
     setShowAddTx(false);
   };
 
   const openEditTransaction = (txId: string) => {
     const tx = transactions.find((item) => item.id === txId);
     if (!tx) return;
+    setEditTxErrors({});
     const txCategories = tx.categories?.length ? tx.categories : [tx.category];
     const primaryCategory = txCategories[0] ?? tx.category;
     const extraCategory = txCategories[1] ?? '';
@@ -200,7 +245,9 @@ export default function AccountsPage() {
   };
 
   const handleEditTx = () => {
-    if (!editTxId || !editTxAccount || !editTxAmount) return;
+    setEditTxErrors({});
+    const errors: typeof editTxErrors = {};
+    if (!editTxId) return;
     const isTransfer = editTxType === 'transfer';
 
     const primaryCategory = isTransfer ? 'Transfer' : editTxCategory.trim() || editTxExtraCategory.trim();
@@ -208,14 +255,24 @@ export default function AccountsPage() {
       ? editTxExtraCategory.trim()
       : '';
 
-    if (!primaryCategory) return;
-    if (isTransfer && (!editTxTransferAccount || editTxTransferAccount === editTxAccount)) return;
+    const amount = Number(editTxAmount);
+    if (!editTxAccount) errors.account = 'Account is required';
+    if (!Number.isFinite(amount) || amount <= 0) errors.amount = 'Amount must be greater than 0';
+    if (!primaryCategory) errors.category = 'Category is required';
+    if (!editTxDate) errors.date = 'Date is required';
+    if (isTransfer && !editTxTransferAccount) errors.transfer = 'Destination account is required';
+    if (isTransfer && editTxTransferAccount === editTxAccount) errors.transfer = 'Destination must be different from source account';
+    if (Object.keys(errors).length > 0) {
+      setEditTxErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     updateTransaction(editTxId, {
       accountId: editTxAccount,
       type: editTxType,
       transferAccountId: isTransfer ? editTxTransferAccount : undefined,
-      amount: parseFloat(editTxAmount) || 0,
+      amount,
       category: primaryCategory,
       categories: isTransfer ? ['Transfer'] : [primaryCategory, extraCategory].filter(Boolean),
       tags: editTxTags.split(/[,\n;]/).map((item) => item.trim()).filter(Boolean),
@@ -223,11 +280,27 @@ export default function AccountsPage() {
       date: editTxDate,
     });
 
+    setEditTxErrors({});
     setEditTxId(null);
   };
 
   const handleAddRecurringRule = () => {
-    if (!ruleLabel.trim() || !ruleAccountId || !ruleAmount || !ruleCategory) return;
+    setAddRuleErrors({});
+    const errors: typeof addRuleErrors = {};
+    if (!ruleLabel.trim()) errors.label = 'Rule label is required';
+    if (!ruleAccountId) errors.account = 'Account is required';
+    if (!(parseFloat(ruleAmount) > 0)) errors.amount = 'Amount must be greater than 0';
+    if (!ruleCategory) errors.category = 'Category is required';
+    if (!ruleStartDate) errors.startDate = 'Start date is required';
+    if (!ruleNextRunDate) errors.nextRunDate = 'Next run date is required';
+    if (ruleFrequency === 'custom' && !(parseInt(ruleIntervalDays, 10) > 0)) {
+      errors.intervalDays = 'Custom interval must be greater than 0';
+    }
+    if (Object.keys(errors).length > 0) {
+      setAddRuleErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     addRecurringTransactionRule({
       label: ruleLabel.trim(),
@@ -255,12 +328,14 @@ export default function AccountsPage() {
     setRuleNextRunDate(new Date().toISOString().split('T')[0]);
     setRuleEndDate('');
     setRuleActive(true);
+    setAddRuleErrors({});
     setShowRecurring(false);
   };
 
   const openEditRecurringRule = (ruleId: string) => {
     const rule = recurringTransactionRules.find((item) => item.id === ruleId);
     if (!rule) return;
+    setEditRuleErrors({});
 
     setEditRecurringId(ruleId);
     setEditRuleLabel(rule.label);
@@ -278,7 +353,23 @@ export default function AccountsPage() {
   };
 
   const handleEditRecurringRule = () => {
-    if (!editRecurringId || !editRuleLabel.trim() || !editRuleAccountId || !editRuleAmount || !editRuleCategory) return;
+    setEditRuleErrors({});
+    const errors: typeof editRuleErrors = {};
+    if (!editRecurringId) return;
+    if (!editRuleLabel.trim()) errors.label = 'Rule label is required';
+    if (!editRuleAccountId) errors.account = 'Account is required';
+    if (!(parseFloat(editRuleAmount) > 0)) errors.amount = 'Amount must be greater than 0';
+    if (!editRuleCategory) errors.category = 'Category is required';
+    if (!editRuleStartDate) errors.startDate = 'Start date is required';
+    if (!editRuleNextRunDate) errors.nextRunDate = 'Next run date is required';
+    if (editRuleFrequency === 'custom' && !(parseInt(editRuleIntervalDays, 10) > 0)) {
+      errors.intervalDays = 'Custom interval must be greater than 0';
+    }
+    if (Object.keys(errors).length > 0) {
+      setEditRuleErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     updateRecurringTransactionRule(editRecurringId, {
       label: editRuleLabel.trim(),
@@ -295,6 +386,7 @@ export default function AccountsPage() {
       active: editRuleActive,
     });
 
+    setEditRuleErrors({});
     setEditRecurringId(null);
   };
 
@@ -406,7 +498,13 @@ export default function AccountsPage() {
         description="Manage your accounts and transactions"
         actions={
           <>
-            <Dialog open={showRecurring} onOpenChange={setShowRecurring}>
+            <Dialog
+              open={showRecurring}
+              onOpenChange={(open) => {
+                setShowRecurring(open);
+                if (!open) setAddRuleErrors({});
+              }}
+            >
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm"><Repeat2 className="h-4 w-4 mr-1" />Recurring</Button>
               </DialogTrigger>
@@ -416,6 +514,7 @@ export default function AccountsPage() {
                   <div className="space-y-1.5 md:col-span-2">
                     <Label>Rule label</Label>
                     <Input placeholder="e.g. Monthly salary" value={ruleLabel} onChange={(e) => setRuleLabel(e.target.value)} />
+                    {addRuleErrors.label ? <p className="text-sm text-destructive">{addRuleErrors.label}</p> : null}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Account</Label>
@@ -425,6 +524,7 @@ export default function AccountsPage() {
                         {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {addRuleErrors.account ? <p className="text-sm text-destructive">{addRuleErrors.account}</p> : null}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Type</Label>
@@ -439,6 +539,7 @@ export default function AccountsPage() {
                   <div className="space-y-1.5">
                     <Label>Amount</Label>
                     <Input type="number" min="0" step="0.01" value={ruleAmount} onChange={(e) => setRuleAmount(e.target.value)} />
+                    {addRuleErrors.amount ? <p className="text-sm text-destructive">{addRuleErrors.amount}</p> : null}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Category</Label>
@@ -448,6 +549,7 @@ export default function AccountsPage() {
                         {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {addRuleErrors.category ? <p className="text-sm text-destructive">{addRuleErrors.category}</p> : null}
                   </div>
                   <div className="space-y-1.5 md:col-span-2">
                     <Label>Description</Label>
@@ -470,10 +572,12 @@ export default function AccountsPage() {
                   <div className="space-y-1.5">
                     <Label>Next run date</Label>
                     <Input type="date" value={ruleNextRunDate} onChange={(e) => setRuleNextRunDate(e.target.value)} />
+                    {addRuleErrors.nextRunDate ? <p className="text-sm text-destructive">{addRuleErrors.nextRunDate}</p> : null}
                   </div>
                   <div className="space-y-1.5">
                     <Label>Start date</Label>
                     <Input type="date" value={ruleStartDate} onChange={(e) => setRuleStartDate(e.target.value)} />
+                    {addRuleErrors.startDate ? <p className="text-sm text-destructive">{addRuleErrors.startDate}</p> : null}
                   </div>
                   <div className="space-y-1.5">
                     <Label>End date</Label>
@@ -489,6 +593,7 @@ export default function AccountsPage() {
                         value={ruleIntervalDays}
                         onChange={(e) => setRuleIntervalDays(e.target.value)}
                       />
+                      {addRuleErrors.intervalDays ? <p className="text-sm text-destructive">{addRuleErrors.intervalDays}</p> : null}
                     </div>
                   )}
                   <div className="flex items-center justify-between rounded-xl border border-border/70 px-3 py-2 md:col-span-2">
@@ -504,7 +609,13 @@ export default function AccountsPage() {
                 </div>
               </DialogContent>
             </Dialog>
-            <Dialog open={showAddAccount} onOpenChange={setShowAddAccount}>
+            <Dialog
+              open={showAddAccount}
+              onOpenChange={(open) => {
+                setShowAddAccount(open);
+                if (!open) setAddAccountErrors({});
+              }}
+            >
             <DialogTrigger asChild>
               <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />Account</Button>
             </DialogTrigger>
@@ -514,6 +625,7 @@ export default function AccountsPage() {
                 <div className="space-y-1.5">
                   <Label>Account name</Label>
                   <Input placeholder="e.g. Main Bank" value={aName} onChange={(e) => setAName(e.target.value)} />
+                  {addAccountErrors.name ? <p className="text-sm text-destructive">{addAccountErrors.name}</p> : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Type</Label>
@@ -529,12 +641,19 @@ export default function AccountsPage() {
                 <div className="space-y-1.5">
                   <Label>Initial balance</Label>
                   <Input placeholder="0.00" type="number" value={aBal} onChange={(e) => setABal(e.target.value)} />
+                  {addAccountErrors.balance ? <p className="text-sm text-destructive">{addAccountErrors.balance}</p> : null}
                 </div>
                 <Button className="w-full mt-2" onClick={handleAddAccount}>Add Account</Button>
               </div>
             </DialogContent>
           </Dialog>
-          <Dialog open={showAddTx} onOpenChange={setShowAddTx}>
+          <Dialog
+            open={showAddTx}
+            onOpenChange={(open) => {
+              setShowAddTx(open);
+              if (!open) setAddTxErrors({});
+            }}
+          >
             <DialogTrigger asChild>
               <Button size="sm"><Plus className="h-4 w-4 mr-1" />Transaction</Button>
             </DialogTrigger>
@@ -549,6 +668,7 @@ export default function AccountsPage() {
                       {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {addTxErrors.account ? <p className="text-sm text-destructive">{addTxErrors.account}</p> : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Transaction type</Label>
@@ -570,11 +690,13 @@ export default function AccountsPage() {
                         {accounts.filter((a) => a.id !== txAccount).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    {addTxErrors.transfer ? <p className="text-sm text-destructive">{addTxErrors.transfer}</p> : null}
                   </div>
                 )}
                 <div className="space-y-1.5">
                   <Label>Amount</Label>
                   <Input placeholder="0.00" type="number" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
+                  {addTxErrors.amount ? <p className="text-sm text-destructive">{addTxErrors.amount}</p> : null}
                 </div>
                 {txType !== 'transfer' && (
                   <>
@@ -586,6 +708,7 @@ export default function AccountsPage() {
                           {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </SelectContent>
                       </Select>
+                      {addTxErrors.category ? <p className="text-sm text-destructive">{addTxErrors.category}</p> : null}
                     </div>
                     <div className="space-y-1.5">
                       <Label>Add category</Label>
@@ -604,6 +727,7 @@ export default function AccountsPage() {
                 <div className="space-y-1.5">
                   <Label>Date</Label>
                   <Input type="date" value={txDate} onChange={(e) => setTxDate(e.target.value)} />
+                  {addTxErrors.date ? <p className="text-sm text-destructive">{addTxErrors.date}</p> : null}
                 </div>
                 <Button className="w-full mt-2" onClick={handleAddTx}>Add Transaction</Button>
               </div>
@@ -614,13 +738,20 @@ export default function AccountsPage() {
       />
 
       {/* Edit Account Dialog */}
-      <Dialog open={!!editAccountId} onOpenChange={() => setEditAccountId(null)}>
+      <Dialog
+        open={!!editAccountId}
+        onOpenChange={() => {
+          setEditAccountId(null);
+          setEditAccountErrors({});
+        }}
+      >
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Account</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Account name</Label>
               <Input placeholder="e.g. Main Bank" value={editAName} onChange={(e) => setEditAName(e.target.value)} />
+              {editAccountErrors.name ? <p className="text-sm text-destructive">{editAccountErrors.name}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
@@ -636,13 +767,20 @@ export default function AccountsPage() {
             <div className="space-y-1.5">
               <Label>Balance</Label>
               <Input placeholder="0.00" type="number" value={editABal} onChange={(e) => setEditABal(e.target.value)} />
+              {editAccountErrors.balance ? <p className="text-sm text-destructive">{editAccountErrors.balance}</p> : null}
             </div>
             <Button className="w-full mt-2" onClick={handleEditAccount}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editTxId} onOpenChange={() => setEditTxId(null)}>
+      <Dialog
+        open={!!editTxId}
+        onOpenChange={() => {
+          setEditTxId(null);
+          setEditTxErrors({});
+        }}
+      >
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Transaction</DialogTitle></DialogHeader>
           <div className="space-y-4">
@@ -654,6 +792,7 @@ export default function AccountsPage() {
                   {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {editTxErrors.account ? <p className="text-sm text-destructive">{editTxErrors.account}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Transaction type</Label>
@@ -675,11 +814,13 @@ export default function AccountsPage() {
                     {accounts.filter((a) => a.id !== editTxAccount).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
+                {editTxErrors.transfer ? <p className="text-sm text-destructive">{editTxErrors.transfer}</p> : null}
               </div>
             )}
             <div className="space-y-1.5">
               <Label>Amount</Label>
               <Input placeholder="0.00" type="number" value={editTxAmount} onChange={(e) => setEditTxAmount(e.target.value)} />
+              {editTxErrors.amount ? <p className="text-sm text-destructive">{editTxErrors.amount}</p> : null}
             </div>
             {editTxType !== 'transfer' && (
               <>
@@ -691,6 +832,7 @@ export default function AccountsPage() {
                       {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {editTxErrors.category ? <p className="text-sm text-destructive">{editTxErrors.category}</p> : null}
                 </div>
                 <div className="space-y-1.5">
                   <Label>Add category</Label>
@@ -709,19 +851,27 @@ export default function AccountsPage() {
             <div className="space-y-1.5">
               <Label>Date</Label>
               <Input type="date" value={editTxDate} onChange={(e) => setEditTxDate(e.target.value)} />
+              {editTxErrors.date ? <p className="text-sm text-destructive">{editTxErrors.date}</p> : null}
             </div>
             <Button className="w-full mt-2" onClick={handleEditTx}>Save Changes</Button>
           </div>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editRecurringId} onOpenChange={() => setEditRecurringId(null)}>
+      <Dialog
+        open={!!editRecurringId}
+        onOpenChange={() => {
+          setEditRecurringId(null);
+          setEditRuleErrors({});
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader><DialogTitle>Edit Recurring Rule</DialogTitle></DialogHeader>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5 md:col-span-2">
               <Label>Rule label</Label>
               <Input placeholder="e.g. Monthly salary" value={editRuleLabel} onChange={(e) => setEditRuleLabel(e.target.value)} />
+              {editRuleErrors.label ? <p className="text-sm text-destructive">{editRuleErrors.label}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Account</Label>
@@ -731,6 +881,7 @@ export default function AccountsPage() {
                   {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {editRuleErrors.account ? <p className="text-sm text-destructive">{editRuleErrors.account}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
@@ -745,6 +896,7 @@ export default function AccountsPage() {
             <div className="space-y-1.5">
               <Label>Amount</Label>
               <Input type="number" min="0" step="0.01" value={editRuleAmount} onChange={(e) => setEditRuleAmount(e.target.value)} />
+              {editRuleErrors.amount ? <p className="text-sm text-destructive">{editRuleErrors.amount}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Category</Label>
@@ -754,6 +906,7 @@ export default function AccountsPage() {
                   {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {editRuleErrors.category ? <p className="text-sm text-destructive">{editRuleErrors.category}</p> : null}
             </div>
             <div className="space-y-1.5 md:col-span-2">
               <Label>Description</Label>
@@ -776,10 +929,12 @@ export default function AccountsPage() {
             <div className="space-y-1.5">
               <Label>Next run date</Label>
               <Input type="date" value={editRuleNextRunDate} onChange={(e) => setEditRuleNextRunDate(e.target.value)} />
+              {editRuleErrors.nextRunDate ? <p className="text-sm text-destructive">{editRuleErrors.nextRunDate}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Start date</Label>
               <Input type="date" value={editRuleStartDate} onChange={(e) => setEditRuleStartDate(e.target.value)} />
+              {editRuleErrors.startDate ? <p className="text-sm text-destructive">{editRuleErrors.startDate}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>End date</Label>
@@ -795,6 +950,7 @@ export default function AccountsPage() {
                   value={editRuleIntervalDays}
                   onChange={(e) => setEditRuleIntervalDays(e.target.value)}
                 />
+                {editRuleErrors.intervalDays ? <p className="text-sm text-destructive">{editRuleErrors.intervalDays}</p> : null}
               </div>
             )}
             <div className="flex items-center justify-between rounded-xl border border-border/70 px-3 py-2 md:col-span-2">
