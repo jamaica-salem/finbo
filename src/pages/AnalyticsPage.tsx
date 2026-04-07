@@ -144,7 +144,12 @@ export default function AnalyticsPage() {
     transactions.forEach((transaction) => {
       const monthKey = `${asDate(transaction.date).getFullYear()}-${String(asDate(transaction.date).getMonth() + 1).padStart(2, '0')}`;
       if (!map[monthKey]) map[monthKey] = { income: 0, expenses: 0 };
-      map[monthKey][transaction.type === 'income' ? 'income' : 'expenses'] += transaction.amount;
+      if (transaction.type === 'income') {
+        map[monthKey].income += transaction.amount;
+      }
+      if (transaction.type === 'expense') {
+        map[monthKey].expenses += transaction.amount;
+      }
     });
 
     return Object.entries(map)
