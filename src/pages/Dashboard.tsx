@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { getCategoryColor } from '@/lib/transactionCategories';
+import { getLoanTotalWithInterest } from '@/lib/interest';
 
 const formatDueDate = (value: string) => {
   const date = new Date(`${value}T00:00:00`);
@@ -41,8 +42,8 @@ export default function Dashboard() {
         ? 'vs last month'
         : `vs last month`;
 
-  const activeLoans = loans.filter((l) => l.paidAmount < l.totalAmount);
-  const totalLoanRemaining = activeLoans.reduce((s, l) => s + (l.totalAmount - l.paidAmount), 0);
+  const activeLoans = loans.filter((l) => l.paidAmount < getLoanTotalWithInterest(l));
+  const totalLoanRemaining = activeLoans.reduce((s, l) => s + Math.max(0, getLoanTotalWithInterest(l) - l.paidAmount), 0);
   const installments = activeLoans.filter((l) => l.type === 'installment');
 
   const totalBillsDue = bills.filter((b) => b.status !== 'paid').reduce((s, b) => s + b.amount, 0);
@@ -111,7 +112,7 @@ export default function Dashboard() {
         <StatCard
           title="Installments"
           value={String(installments.length)}
-          subtitle={`${currency}${installments.reduce((s, i) => s + (i.totalAmount - i.paidAmount), 0).toLocaleString()} remaining`}
+          subtitle={`${currency}${installments.reduce((s, i) => s + Math.max(0, getLoanTotalWithInterest(i) - i.paidAmount), 0).toLocaleString()} remaining`}
           icon={<CalendarClock className="h-5 w-5" />}
         />
       </div>
@@ -209,7 +210,8 @@ export default function Dashboard() {
               <p className="text-sm text-muted-foreground">No active loans.</p>
             ) : (
               activeLoans.map((l) => {
-                const pct = Math.round((l.paidAmount / l.totalAmount) * 100);
+                const totalWithInterest = getLoanTotalWithInterest(l);
+                const pct = totalWithInterest > 0 ? Math.round((l.paidAmount / totalWithInterest) * 100) : 0;
                 return (
                   <div key={l.id} className="space-y-1.5">
                     <div className="flex items-center justify-between">
@@ -218,7 +220,7 @@ export default function Dashboard() {
                     </div>
                     <Progress value={pct} className="h-2" />
                     <p className="text-xs text-muted-foreground">
-                      {currency}{l.paidAmount.toLocaleString()} / {currency}{l.totalAmount.toLocaleString()}
+                      {currency}{l.paidAmount.toLocaleString()} / {currency}{totalWithInterest.toLocaleString()}
                     </p>
                   </div>
                 );
