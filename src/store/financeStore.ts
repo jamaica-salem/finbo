@@ -5,6 +5,8 @@ import type {
   Transaction,
   RecurringTransactionRule,
   RecurringTransactionFrequency,
+  CategoryRule,
+  CategoryRuleMatchType,
   MonthlyBudget,
   BudgetAlert,
   Loan,
@@ -46,6 +48,32 @@ const splitList = (value?: string | string[]) => {
 const getTransactionCategories = (transaction: Transaction) => {
   const categories = splitList(transaction.categories);
   return categories.length > 0 ? categories : [transaction.category].filter(Boolean);
+};
+
+const normalizeCategoryName = (value: string) => value.trim();
+const uniqueCategories = (values: string[]) => [...new Set(values.map(normalizeCategoryName).filter(Boolean))];
+const sameCategory = (a: string, b: string) => normalizeCategoryName(a).toLowerCase() === normalizeCategoryName(b).toLowerCase();
+
+const matchCategoryRule = (value: string, pattern: string, matchType: CategoryRuleMatchType) => {
+  const normalizedValue = value.trim().toLowerCase();
+  const normalizedPattern = pattern.trim().toLowerCase();
+  if (!normalizedValue || !normalizedPattern) return false;
+  if (matchType === 'equals') return normalizedValue === normalizedPattern;
+  if (matchType === 'startsWith') return normalizedValue.startsWith(normalizedPattern);
+  return normalizedValue.includes(normalizedPattern);
+};
+
+const inferCategoryFromRules = (tx: Pick<Transaction, 'description' | 'category'>, rules: CategoryRule[]) => {
+  const haystacks = [tx.description, tx.category].filter(Boolean) as string[];
+  const activeRules = rules.filter((rule) => rule.active);
+  for (const haystack of haystacks) {
+    for (const rule of activeRules) {
+      if (matchCategoryRule(haystack, rule.pattern, rule.matchType)) {
+        return rule.category;
+      }
+    }
+  }
+  return '';
 };
 const CATEGORY_COLOR_PALETTE = [
   '#22c55e',
@@ -142,6 +170,7 @@ const normalizeBill = (bill: Partial<Bill> & { dueDay?: unknown }): Bill => {
     active: typeof (bill as Partial<Bill>).active === 'boolean' ? (bill as Partial<Bill>).active : true,
     status: bill.status === 'paid' || bill.status === 'pending' || bill.status === 'overdue' ? bill.status : 'pending',
     paidDate: isIsoDate(bill.paidDate) ? bill.paidDate : undefined,
+    lastPaidDate: isIsoDate((bill as any).lastPaidDate) ? (bill as any).lastPaidDate : undefined,
   };
 };
 
@@ -236,6 +265,10 @@ const initialAccounts: Account[] = [];
 
 const initialTransactions: Transaction[] = [];
 const initialRecurringTransactionRules: RecurringTransactionRule[] = [];
+const initialCategoryRules: CategoryRule[] = [];
+const initialTransactionCategories: string[] = [];
+const initialSavingsCategories: string[] = [];
+const initialSharedCategories: string[] = [];
 const initialBudgets: MonthlyBudget[] = [];
 const initialCategoryColors: Record<string, string> = {};
 
@@ -251,10 +284,30 @@ const initialSavingsGoalContributions: SavingsGoalContribution[] = [];
 
 const initialBills: Bill[] = [];
 
+type UndoEntryType =
+  | 'deleteTransaction'
+  | 'deleteBill'
+  | 'deleteLoan'
+  | 'deleteCreditCard'
+  | 'deleteSavingsGoal'
+  | 'replace';
+
+interface UndoEntry {
+  id: string;
+  type: UndoEntryType;
+  // payload contains the previous object and index or full snapshot for replace
+  payload: any;
+  ts: string;
+}
+
 interface FinanceState {
   accounts: Account[];
   transactions: Transaction[];
   recurringTransactionRules: RecurringTransactionRule[];
+  categoryRules: CategoryRule[];
+  transactionCategories: string[];
+  savingsCategories: string[];
+  sharedCategories: string[];
   budgets: MonthlyBudget[];
   categoryColors: Record<string, string>;
   loans: Loan[];
@@ -265,7 +318,8 @@ interface FinanceState {
   savingsGoals: SavingsGoal[];
   savingsGoalContributions: SavingsGoalContribution[];
   currency: string;
-  
+  // lightweight undo history for destructive actions
+  undoStack: UndoEntry[];
   // Account actions
   addAccount: (account: Omit<Account, 'id'>) => void;
   updateAccount: (id: string, data: Partial<Account>) => void;
@@ -279,6 +333,17 @@ interface FinanceState {
   updateRecurringTransactionRule: (id: string, data: Partial<RecurringTransactionRule>) => void;
   deleteRecurringTransactionRule: (id: string) => void;
   runRecurringTransactionScheduler: () => void;
+
+  // Category actions
+  addCategoryRule: (rule: Omit<CategoryRule, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  updateCategoryRule: (id: string, data: Partial<CategoryRule>) => void;
+  deleteCategoryRule: (id: string) => void;
+  setCategoryColor: (category: string, color: string) => void;
+  addTransactionCategory: (category: string) => void;
+  addSavingsCategory: (category: string) => void;
+  addSharedCategory: (category: string) => void;
+  renameCategory: (scope: 'transaction' | 'savings', from: string, to: string) => void;
+  deleteCategory: (scope: 'transaction' | 'savings', name: string) => void;
 
   // Budget actions
   addBudget: (budget: Omit<MonthlyBudget, 'id' | 'createdAt' | 'updatedAt' | 'lastWarningMonthKey' | 'lastExceededMonthKey'>) => void;
@@ -319,10 +384,14 @@ interface FinanceState {
 
 export const useFinanceStore = create<FinanceState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       accounts: initialAccounts,
       transactions: initialTransactions,
       recurringTransactionRules: initialRecurringTransactionRules,
+      categoryRules: initialCategoryRules,
+      transactionCategories: initialTransactionCategories,
+      savingsCategories: initialSavingsCategories,
+      sharedCategories: initialSharedCategories,
       budgets: initialBudgets,
       categoryColors: initialCategoryColors,
       loans: initialLoans,
@@ -333,13 +402,16 @@ export const useFinanceStore = create<FinanceState>()(
       savingsGoals: initialSavingsGoals,
       savingsGoalContributions: initialSavingsGoalContributions,
       currency: '₱',
+      undoStack: [],
 
       addAccount: (account) => set((s) => ({ accounts: [...s.accounts, { ...account, id: uid() }] })),
       updateAccount: (id, data) => set((s) => ({ accounts: s.accounts.map((a) => a.id === id ? { ...a, ...data } : a) })),
       deleteAccount: (id) => set((s) => ({ accounts: s.accounts.filter((a) => a.id !== id) })),
 
       addTransaction: (tx) => set((s) => {
-        const categories = splitList(tx.categories).length > 0 ? splitList(tx.categories) : [tx.category];
+        const inferredCategory = inferCategoryFromRules(tx, s.categoryRules);
+        const category = tx.category?.trim() || inferredCategory || 'Other';
+        const categories = splitList(tx.categories).length > 0 ? splitList(tx.categories) : [category];
         const transferAccountId = tx.type === 'transfer' ? tx.transferAccountId : undefined;
         if (tx.type === 'transfer' && (!transferAccountId || transferAccountId === tx.accountId)) {
           return s;
@@ -348,6 +420,7 @@ export const useFinanceStore = create<FinanceState>()(
           ...tx,
           id: uid(),
           transferAccountId,
+          category,
           categories,
           tags: splitList(tx.tags),
         };
@@ -363,6 +436,7 @@ export const useFinanceStore = create<FinanceState>()(
           transactions: [newTx, ...s.transactions],
           accounts,
           categoryColors: ensureCategoryColors(categories, s.categoryColors),
+          transactionCategories: uniqueCategories([...(s.transactionCategories ?? []), ...categories]),
         };
       }),
       updateTransaction: (id, data) => set((s) => {
@@ -415,7 +489,8 @@ export const useFinanceStore = create<FinanceState>()(
         };
       }),
       deleteTransaction: (id) => set((s) => {
-        const tx = s.transactions.find((t) => t.id === id);
+        const txIndex = s.transactions.findIndex((t) => t.id === id);
+        const tx = s.transactions[txIndex];
         if (!tx) return s;
         const accountEffects = getTransactionAccountEffects(tx);
         const accounts = s.accounts.map((a) => {
@@ -425,7 +500,19 @@ export const useFinanceStore = create<FinanceState>()(
           }
           return a;
         });
-        return { transactions: s.transactions.filter((t) => t.id !== id), accounts };
+
+        const undoEntry: UndoEntry = {
+          id: uid(),
+          type: 'deleteTransaction',
+          payload: { item: tx, index: txIndex },
+          ts: new Date().toISOString(),
+        };
+
+        return {
+          transactions: s.transactions.filter((t) => t.id !== id),
+          accounts,
+          undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20),
+        };
       }),
       addRecurringTransactionRule: (rule) => set((s) => {
         const startDate = rule.nextRunDate ?? rule.startDate;
@@ -514,6 +601,104 @@ export const useFinanceStore = create<FinanceState>()(
           accounts,
           recurringTransactionRules: nextRules,
           categoryColors,
+        };
+      }),
+
+      addCategoryRule: (rule) => set((s) => {
+        const now = new Date().toISOString();
+        const nextRule: CategoryRule = {
+          ...rule,
+          id: uid(),
+          createdAt: now,
+          updatedAt: now,
+          pattern: rule.pattern.trim(),
+          category: rule.category.trim(),
+        };
+        return {
+          categoryRules: [...s.categoryRules, nextRule],
+          transactionCategories: uniqueCategories([...(s.transactionCategories ?? []), nextRule.category]),
+          categoryColors: ensureCategoryColors([nextRule.category], s.categoryColors),
+        };
+      }),
+      updateCategoryRule: (id, data) => set((s) => ({
+        categoryRules: s.categoryRules.map((rule) => rule.id === id ? { ...rule, ...data, pattern: data.pattern?.trim() ?? rule.pattern, category: data.category?.trim() ?? rule.category, updatedAt: new Date().toISOString() } : rule),
+        transactionCategories: data.category ? uniqueCategories([...(s.transactionCategories ?? []), data.category]) : s.transactionCategories,
+        categoryColors: data.category ? ensureCategoryColors([data.category], s.categoryColors) : s.categoryColors,
+      })),
+      deleteCategoryRule: (id) => set((s) => ({ categoryRules: s.categoryRules.filter((rule) => rule.id !== id) })),
+      setCategoryColor: (category, color) => set((s) => ({ categoryColors: { ...s.categoryColors, [category.trim()]: color } })),
+      addTransactionCategory: (category) => set((s) => ({ transactionCategories: uniqueCategories([...s.transactionCategories, category]) })),
+      addSavingsCategory: (category) => set((s) => ({ savingsCategories: uniqueCategories([...s.savingsCategories, category]) })),
+      addSharedCategory: (category) => set((s) => ({ sharedCategories: uniqueCategories([...s.sharedCategories, category]) })),
+      renameCategory: (scope, from, to) => set((s) => {
+        const source = normalizeCategoryName(from);
+        const target = normalizeCategoryName(to);
+        if (!source || !target || sameCategory(source, target)) return s;
+
+        if (scope === 'savings') {
+          return {
+            savingsCategories: uniqueCategories(s.savingsCategories.map((item) => sameCategory(item, source) ? target : item)),
+            savingsGoals: s.savingsGoals.map((goal) => sameCategory(goal.category, source) ? { ...goal, category: target } : goal),
+            categoryColors: Object.entries(s.categoryColors).reduce<Record<string, string>>((acc, [key, color]) => {
+              if (sameCategory(key, source)) {
+                acc[target] = color;
+              } else {
+                acc[key] = color;
+              }
+              return acc;
+            }, {}),
+          };
+        }
+
+        return {
+          transactionCategories: uniqueCategories(s.transactionCategories.map((item) => sameCategory(item, source) ? target : item)),
+          sharedCategories: uniqueCategories(s.sharedCategories.map((item) => sameCategory(item, source) ? target : item)),
+          transactions: s.transactions.map((tx) => ({
+            ...tx,
+            category: sameCategory(tx.category, source) ? target : tx.category,
+            categories: (tx.categories ?? []).map((item) => sameCategory(item, source) ? target : item),
+          })),
+          bills: s.bills.map((bill) => sameCategory(bill.category, source) ? { ...bill, category: target } : bill),
+          budgets: s.budgets.map((budget) => sameCategory(budget.category, source) ? { ...budget, category: target } : budget),
+          recurringTransactionRules: s.recurringTransactionRules.map((rule) => sameCategory(rule.category, source) ? { ...rule, category: target } : rule),
+          categoryRules: s.categoryRules.map((rule) => sameCategory(rule.category, source) ? { ...rule, category: target, updatedAt: new Date().toISOString() } : rule),
+          categoryColors: Object.entries(s.categoryColors).reduce<Record<string, string>>((acc, [key, color]) => {
+            if (sameCategory(key, source)) {
+              acc[target] = color;
+            } else {
+              acc[key] = color;
+            }
+            return acc;
+          }, {}),
+        };
+      }),
+      deleteCategory: (scope, name) => set((s) => {
+        const target = normalizeCategoryName(name);
+        if (!target) return s;
+
+        if (scope === 'savings') {
+          const nextColors = Object.fromEntries(Object.entries(s.categoryColors).filter(([key]) => !sameCategory(key, target)));
+          return {
+            savingsCategories: s.savingsCategories.filter((item) => !sameCategory(item, target)),
+            savingsGoals: s.savingsGoals.map((goal) => sameCategory(goal.category, target) ? { ...goal, category: 'Other' } : goal),
+            categoryColors: nextColors,
+          };
+        }
+
+        const nextColors = Object.fromEntries(Object.entries(s.categoryColors).filter(([key]) => !sameCategory(key, target)));
+        return {
+          transactionCategories: s.transactionCategories.filter((item) => !sameCategory(item, target)),
+          sharedCategories: s.sharedCategories.filter((item) => !sameCategory(item, target)),
+          transactions: s.transactions.map((tx) => ({
+            ...tx,
+            category: sameCategory(tx.category, target) ? 'Other' : tx.category,
+            categories: (tx.categories ?? []).map((item) => sameCategory(item, target) ? 'Other' : item),
+          })),
+          bills: s.bills.map((bill) => sameCategory(bill.category, target) ? { ...bill, category: 'Other' } : bill),
+          budgets: s.budgets.map((budget) => sameCategory(budget.category, target) ? { ...budget, category: 'Other' } : budget),
+          recurringTransactionRules: s.recurringTransactionRules.map((rule) => sameCategory(rule.category, target) ? { ...rule, category: 'Other' } : rule),
+          categoryRules: s.categoryRules.map((rule) => sameCategory(rule.category, target) ? { ...rule, category: 'Other', updatedAt: new Date().toISOString() } : rule),
+          categoryColors: nextColors,
         };
       }),
 
@@ -641,7 +826,13 @@ export const useFinanceStore = create<FinanceState>()(
           return normalizeLoan({ ...loan, ...data, id });
         }),
       })),
-      deleteLoan: (id) => set((s) => ({ loans: s.loans.filter((l) => l.id !== id) })),
+      deleteLoan: (id) => set((s) => {
+        const idx = s.loans.findIndex((l) => l.id === id);
+        const item = s.loans[idx];
+        if (!item) return s;
+        const undoEntry: UndoEntry = { id: uid(), type: 'deleteLoan', payload: { item, index: idx }, ts: new Date().toISOString() };
+        return { loans: s.loans.filter((l) => l.id !== id), undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20) };
+      }),
       logLoanPayment: (loanId, amount, note) => set((s) => {
         const payment: LoanPayment = { id: uid(), loanId, amount, date: new Date().toISOString().split('T')[0], note };
         const loans = s.loans.map((loan) => {
@@ -661,10 +852,18 @@ export const useFinanceStore = create<FinanceState>()(
       updateCreditCard: (id, data) => set((s) => ({
         creditCards: s.creditCards.map((card) => (card.id === id ? { ...card, ...data } : card)),
       })),
-      deleteCreditCard: (id) => set((s) => ({
-        creditCards: s.creditCards.filter((card) => card.id !== id),
-        creditCardActivities: s.creditCardActivities.filter((activity) => activity.cardId !== id),
-      })),
+      deleteCreditCard: (id) => set((s) => {
+        const idx = s.creditCards.findIndex((c) => c.id === id);
+        const item = s.creditCards[idx];
+        if (!item) return s;
+        const activities = s.creditCardActivities.filter((activity) => activity.cardId === id);
+        const undoEntry: UndoEntry = { id: uid(), type: 'deleteCreditCard', payload: { item, index: idx, activities }, ts: new Date().toISOString() };
+        return {
+          creditCards: s.creditCards.filter((card) => card.id !== id),
+          creditCardActivities: s.creditCardActivities.filter((activity) => activity.cardId !== id),
+          undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20),
+        };
+      }),
       logCreditCardPayment: (cardId, amount, note) => set((s) => {
         const paymentAmount = Math.max(0, amount);
         const payment: CreditCardActivity = {
@@ -714,42 +913,50 @@ export const useFinanceStore = create<FinanceState>()(
 
       addBill: (bill) => set((s) => ({ bills: [...s.bills, { ...bill, id: uid() }] })),
       updateBill: (id, data) => set((s) => ({ bills: s.bills.map((b) => b.id === id ? { ...b, ...data } : b) })),
-      deleteBill: (id) => set((s) => ({ bills: s.bills.filter((b) => b.id !== id) })),
-      markBillPaid: (id) => set((s) => {
-        const paidDate = new Date().toISOString().split('T')[0];
-        const updated = s.bills.map((b) => (b.id === id ? { ...b, status: 'paid' as const, paidDate } : b));
+      deleteBill: (id) => set((s) => {
+        const idx = s.bills.findIndex((b) => b.id === id);
+        const item = s.bills[idx];
+        if (!item) return s;
+        const undoEntry: UndoEntry = { id: uid(), type: 'deleteBill', payload: { item, index: idx }, ts: new Date().toISOString() };
+        return { bills: s.bills.filter((b) => b.id !== id), undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20) };
+      }),
+      markBillPaid: (id, paidDateArg) => set((s) => {
+        const paidDate = typeof paidDateArg === 'string' && isIsoDate(paidDateArg) ? paidDateArg : new Date().toISOString().split('T')[0];
+        const bills = s.bills.map((bill) => {
+          if (bill.id !== id) return bill;
 
-        const orig = s.bills.find((b) => b.id === id);
-        if (!orig) return { bills: updated };
-
-        // If the bill is recurring and active, create the next occurrence
-        if (orig.recurring && (orig as Partial<Bill>).active !== false) {
-          try {
-            const current = isIsoDate(orig.dueDate) ? toDate(orig.dueDate) : new Date();
-            const freq = (orig as Partial<Bill>).frequency ?? 'monthly';
-            const interval = (orig as Partial<Bill>).intervalDays ?? undefined;
-            const next = nextRecurringDate(current, freq, interval);
-            const nextDue = formatDate(next);
-            const newBill: Bill = {
-              id: uid(),
-              name: orig.name,
-              amount: orig.amount,
-              category: orig.category,
-              dueDate: nextDue,
-              recurring: true,
-              frequency: freq,
-              intervalDays: interval,
-              active: (orig as Partial<Bill>).active ?? true,
-              status: 'pending',
-            };
-
-            return { bills: [...updated, newBill] };
-          } catch (e) {
-            return { bills: updated };
+          // For recurring active bills, record the last paid date then advance its due date.
+          if (bill.recurring && (bill as Partial<Bill>).active !== false) {
+            try {
+              const current = isIsoDate(bill.dueDate) ? toDate(bill.dueDate) : new Date();
+              const freq = (bill as Partial<Bill>).frequency ?? 'monthly';
+              const interval = (bill as Partial<Bill>).intervalDays ?? undefined;
+              const nextDue = formatDate(nextRecurringDate(current, freq, interval));
+              return {
+                ...bill,
+                // preserve a record of when this occurrence was paid
+                lastPaidDate: paidDate,
+                dueDate: nextDue,
+                status: 'pending' as const,
+                paidDate: undefined,
+              };
+            } catch {
+              return {
+                ...bill,
+                status: 'paid' as const,
+                paidDate,
+              };
+            }
           }
-        }
 
-        return { bills: updated };
+          return {
+            ...bill,
+            status: 'paid' as const,
+            paidDate,
+          };
+        });
+
+        return { bills };
       }),
       markBillUnpaid: (id) => set((s) => ({
         bills: s.bills.map((b) => b.id === id ? { ...b, status: 'pending' as const, paidDate: undefined } : b),
@@ -765,14 +972,24 @@ export const useFinanceStore = create<FinanceState>()(
             savedAmount: goal.savedAmount ?? 0,
           },
         ],
+        savingsCategories: uniqueCategories([...(s.savingsCategories ?? []), goal.category]),
       })),
       updateSavingsGoal: (id, data) => set((s) => ({
         savingsGoals: s.savingsGoals.map((goal) => (goal.id === id ? { ...goal, ...data } : goal)),
+        savingsCategories: data.category ? uniqueCategories([...(s.savingsCategories ?? []), data.category]) : s.savingsCategories,
       })),
-      deleteSavingsGoal: (id) => set((s) => ({
-        savingsGoals: s.savingsGoals.filter((goal) => goal.id !== id),
-        savingsGoalContributions: s.savingsGoalContributions.filter((contribution) => contribution.goalId !== id),
-      })),
+      deleteSavingsGoal: (id) => set((s) => {
+        const idx = s.savingsGoals.findIndex((g) => g.id === id);
+        const item = s.savingsGoals[idx];
+        if (!item) return s;
+        const contributions = s.savingsGoalContributions.filter((c) => c.goalId === id);
+        const undoEntry: UndoEntry = { id: uid(), type: 'deleteSavingsGoal', payload: { item, index: idx, contributions }, ts: new Date().toISOString() };
+        return {
+          savingsGoals: s.savingsGoals.filter((goal) => goal.id !== id),
+          savingsGoalContributions: s.savingsGoalContributions.filter((contribution) => contribution.goalId !== id),
+          undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20),
+        };
+      }),
       addSavingsContribution: (goalId, amount, note) => set((s) => {
         const contributionAmount = Math.max(0, amount);
         const date = new Date().toISOString().split('T')[0];
@@ -802,20 +1019,159 @@ export const useFinanceStore = create<FinanceState>()(
       }),
 
       setCurrency: (currency) => set({ currency }),
-      replaceFinanceData: (data) => set({
-        accounts: data.accounts,
-        transactions: data.transactions,
-        recurringTransactionRules: (data as FinanceDataState & { recurringTransactionRules?: RecurringTransactionRule[] }).recurringTransactionRules ?? [],
-        budgets: (data as FinanceDataState & { budgets?: MonthlyBudget[] }).budgets ?? [],
-        categoryColors: (data as FinanceDataState & { categoryColors?: Record<string, string> }).categoryColors ?? {},
-        loans: data.loans.map((loan) => normalizeLoan(loan)),
-        loanPayments: data.loanPayments,
-        creditCards: data.creditCards.map((card) => normalizeCreditCard(card)),
-        creditCardActivities: data.creditCardActivities,
-        bills: data.bills,
-        savingsGoals: data.savingsGoals,
-        savingsGoalContributions: data.savingsGoalContributions,
-        currency: data.currency,
+      // pushUndoEntry defined above
+
+      undoLast: () => set((s) => {
+        const entry = (s.undoStack && s.undoStack.length > 0) ? s.undoStack[0] : undefined;
+        if (!entry) return s;
+
+        const remaining = s.undoStack.slice(1);
+
+        const insertAt = <T,>(arr: T[], index: number, item: T) => {
+          const clamped = Math.max(0, Math.min(index, arr.length));
+          return [...arr.slice(0, clamped), item, ...arr.slice(clamped)];
+        };
+
+        switch (entry.type) {
+          case 'deleteTransaction': {
+            const tx = entry.payload.item as Transaction;
+            const accounts = s.accounts.map((a) => {
+              const delta = getTransactionAccountEffects(tx).get(a.id) ?? 0;
+              if (delta !== 0) return { ...a, balance: a.balance + delta };
+              return a;
+            });
+            return {
+              transactions: insertAt(s.transactions, entry.payload.index ?? 0, tx),
+              accounts,
+              undoStack: remaining,
+            } as Partial<FinanceState> as any;
+          }
+          case 'deleteBill': {
+            const bill = entry.payload.item as Bill;
+            return { bills: insertAt(s.bills, entry.payload.index ?? 0, bill), undoStack: remaining } as any;
+          }
+          case 'deleteLoan': {
+            const loan = entry.payload.item as Loan;
+            return { loans: insertAt(s.loans, entry.payload.index ?? 0, loan), undoStack: remaining } as any;
+          }
+          case 'deleteCreditCard': {
+            const card = entry.payload.item as CreditCard;
+            const activities = entry.payload.activities as CreditCardActivity[];
+            return {
+              creditCards: insertAt(s.creditCards, entry.payload.index ?? 0, card),
+              creditCardActivities: [...activities, ...s.creditCardActivities],
+              undoStack: remaining,
+            } as any;
+          }
+          case 'deleteSavingsGoal': {
+            const goal = entry.payload.item as SavingsGoal;
+            const contributions = entry.payload.contributions as SavingsGoalContribution[];
+            return {
+              savingsGoals: insertAt(s.savingsGoals, entry.payload.index ?? 0, goal),
+              savingsGoalContributions: [...contributions, ...s.savingsGoalContributions],
+              undoStack: remaining,
+            } as any;
+          }
+          case 'replace': {
+            // restore previous full snapshot
+            const previous = entry.payload.previous as FinanceDataState;
+            // use the existing replaceFinanceData helper if available
+            const fn = (get as any)().replaceFinanceData;
+            if (typeof fn === 'function') {
+              // call outside of set to avoid nested set
+              set(() => ({ undoStack: remaining }));
+              fn(previous as any);
+              return s;
+            }
+            return s;
+          }
+          default:
+            return { undoStack: remaining } as any;
+        }
+      }),
+
+      pushUndoEntry: (entry) => set((s) => ({ undoStack: [entry, ...(s.undoStack ?? [])].slice(0, 20) })),
+
+      replaceFinanceData: (data) => set((s) => {
+        const previous: FinanceDataState = {
+          accounts: s.accounts,
+          transactions: s.transactions,
+          recurringTransactionRules: s.recurringTransactionRules,
+          categoryRules: s.categoryRules,
+          transactionCategories: s.transactionCategories,
+          savingsCategories: s.savingsCategories,
+          sharedCategories: s.sharedCategories,
+          budgets: s.budgets,
+          categoryColors: s.categoryColors,
+          loans: s.loans,
+          loanPayments: s.loanPayments,
+          creditCards: s.creditCards,
+          creditCardActivities: s.creditCardActivities,
+          bills: s.bills,
+          savingsGoals: s.savingsGoals,
+          savingsGoalContributions: s.savingsGoalContributions,
+          currency: s.currency,
+        };
+
+        const undoEntry: UndoEntry = { id: uid(), type: 'replace', payload: { previous }, ts: new Date().toISOString() };
+
+        return {
+          accounts: data.accounts,
+          transactions: data.transactions,
+          recurringTransactionRules: (data as FinanceDataState & { recurringTransactionRules?: RecurringTransactionRule[] }).recurringTransactionRules ?? [],
+          categoryRules: (data as FinanceDataState & { categoryRules?: CategoryRule[] }).categoryRules ?? [],
+          transactionCategories: (data as FinanceDataState & { transactionCategories?: string[] }).transactionCategories ?? [],
+          savingsCategories: (data as FinanceDataState & { savingsCategories?: string[] }).savingsCategories ?? [],
+          sharedCategories: (data as FinanceDataState & { sharedCategories?: string[] }).sharedCategories ?? [],
+          budgets: (data as FinanceDataState & { budgets?: MonthlyBudget[] }).budgets ?? [],
+          categoryColors: (data as FinanceDataState & { categoryColors?: Record<string, string> }).categoryColors ?? {},
+          loans: data.loans.map((loan) => normalizeLoan(loan)),
+          loanPayments: data.loanPayments,
+          creditCards: data.creditCards.map((card) => normalizeCreditCard(card)),
+          creditCardActivities: data.creditCardActivities,
+          bills: data.bills,
+          savingsGoals: data.savingsGoals,
+          savingsGoalContributions: data.savingsGoalContributions,
+          currency: data.currency,
+          undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20),
+        };
+      }),
+      mergeFinanceData: (data) => set((s) => {
+        const mergeById = <T extends { id: string }>(existing: T[], incoming: T[], normalize?: (item: any) => T) => {
+          const existingIds = new Set(existing.map((i) => i.id));
+          const toAdd: T[] = [];
+          incoming.forEach((item) => {
+            const normalized = normalize ? normalize(item) : (item as T);
+            const id = (normalized as any).id ?? uid();
+            if (!existingIds.has(id)) {
+              toAdd.push({ ...normalized, id } as T);
+            }
+          });
+          return [...existing, ...toAdd];
+        };
+
+        return {
+          accounts: mergeById(s.accounts, data.accounts ?? []),
+          transactions: mergeById(s.transactions, data.transactions ?? []),
+          recurringTransactionRules: mergeById(s.recurringTransactionRules, data.recurringTransactionRules ?? []),
+          categoryRules: mergeById(s.categoryRules, (data as FinanceDataState & { categoryRules?: CategoryRule[] }).categoryRules ?? []),
+          transactionCategories: uniqueCategories([...(s.transactionCategories ?? []), ...((data as FinanceDataState & { transactionCategories?: string[] }).transactionCategories ?? [])]),
+          savingsCategories: uniqueCategories([...(s.savingsCategories ?? []), ...((data as FinanceDataState & { savingsCategories?: string[] }).savingsCategories ?? [])]),
+          sharedCategories: uniqueCategories([...(s.sharedCategories ?? []), ...((data as FinanceDataState & { sharedCategories?: string[] }).sharedCategories ?? [])]),
+          budgets: mergeById(s.budgets, data.budgets ?? []),
+          categoryColors: Object.keys(data.categoryColors ?? {}).reduce((acc, key) => {
+            if (!acc[key]) acc[key] = (data.categoryColors as Record<string, string>)[key];
+            return acc;
+          }, { ...s.categoryColors }),
+          loans: mergeById(s.loans, (data.loans ?? []).map((l) => normalizeLoan(l as Partial<typeof l>))),
+          loanPayments: mergeById(s.loanPayments, data.loanPayments ?? []),
+          creditCards: mergeById(s.creditCards, (data.creditCards ?? []).map((c) => normalizeCreditCard(c as Partial<typeof c>))),
+          creditCardActivities: mergeById(s.creditCardActivities, data.creditCardActivities ?? []),
+          bills: mergeById(s.bills, (data.bills ?? []).map((b) => normalizeBill(b as Partial<typeof b>))),
+          savingsGoals: mergeById(s.savingsGoals, data.savingsGoals ?? []),
+          savingsGoalContributions: mergeById(s.savingsGoalContributions, data.savingsGoalContributions ?? []),
+          currency: s.currency || data.currency || '₱',
+        };
       }),
     }),
     {
@@ -828,6 +1184,10 @@ export const useFinanceStore = create<FinanceState>()(
         return {
           ...state,
           recurringTransactionRules: state.recurringTransactionRules ?? [],
+          categoryRules: state.categoryRules ?? [],
+          transactionCategories: state.transactionCategories ?? [],
+          savingsCategories: state.savingsCategories ?? [],
+          sharedCategories: state.sharedCategories ?? [],
           budgets: state.budgets ?? [],
           categoryColors: state.categoryColors ?? {},
           loans: state.loans?.map((loan) => normalizeLoan(loan)) ?? [],
@@ -845,6 +1205,10 @@ export const useFinanceStore = create<FinanceState>()(
           ...currentState,
           ...typedState,
           recurringTransactionRules: typedState.recurringTransactionRules ?? currentState.recurringTransactionRules,
+          categoryRules: typedState.categoryRules ?? currentState.categoryRules,
+          transactionCategories: typedState.transactionCategories ?? currentState.transactionCategories,
+          savingsCategories: typedState.savingsCategories ?? currentState.savingsCategories,
+          sharedCategories: typedState.sharedCategories ?? currentState.sharedCategories,
           budgets: typedState.budgets ?? currentState.budgets,
           categoryColors: typedState.categoryColors ?? currentState.categoryColors,
           loans: typedState.loans?.map((loan) => normalizeLoan(loan)) ?? currentState.loans,
