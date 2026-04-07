@@ -24,6 +24,18 @@ export interface Transaction {
   scheduledDate?: string;
 }
 
+export type CategoryRuleMatchType = 'contains' | 'startsWith' | 'equals';
+
+export interface CategoryRule {
+  id: string;
+  pattern: string;
+  category: string;
+  matchType: CategoryRuleMatchType;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type RecurringTransactionFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'yearly' | 'custom';
 
 export interface RecurringTransactionRule {
@@ -143,6 +155,7 @@ export interface Bill {
   active?: boolean;
   status: BillStatus;
   paidDate?: string;
+  lastPaidDate?: string;
 }
 
 export interface BillInstance {
@@ -154,9 +167,10 @@ export interface BillInstance {
   dueDate: string;
   status: BillStatus;
   paidDate?: string;
+  lastPaidDate?: string;
 }
 
-export type SavingsGoalCategory = 'Vacation' | 'Emergency Fund' | 'Home' | 'Education' | 'Tech' | 'Other';
+export type SavingsGoalCategory = string;
 
 export interface SavingsGoal {
   id: string;
@@ -182,6 +196,10 @@ export interface FinanceDataState {
   accounts: Account[];
   transactions: Transaction[];
   recurringTransactionRules: RecurringTransactionRule[];
+  categoryRules: CategoryRule[];
+  transactionCategories: string[];
+  savingsCategories: string[];
+  sharedCategories: string[];
   budgets: MonthlyBudget[];
   categoryColors: Record<string, string>;
   loans: Loan[];
