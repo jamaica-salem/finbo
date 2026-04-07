@@ -1,16 +1,109 @@
 import { useState } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import { useFinanceStore } from '@/store/financeStore';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Progress } from '@/components/ui/progress';
 import { PageHeader } from '@/components/PageHeader';
 import { Plus, Trash2, CreditCard, Pencil, PhilippinePeso, TrendingDown, CalendarClock, Percent } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { deriveLoanMonthlyInterestRate, getLoanNextDueAmount, getLoanNextDueDate, getLoanTotalWithInterest } from '@/lib/interest';
+
+type LoanScheduleFormRow = {
+  id: string;
+  dueDate: string;
+  amount: string;
+  paidAmount: string;
+};
+
+const createScheduleRow = (overrides: Partial<LoanScheduleFormRow> = {}): LoanScheduleFormRow => ({
+  id: Math.random().toString(36).slice(2, 10),
+  dueDate: '',
+  amount: '',
+  paidAmount: '0',
+  ...overrides,
+});
+
+const normalizeScheduleRows = (rows: LoanScheduleFormRow[]) =>
+  rows
+    .filter((row) => row.dueDate && Number(row.amount) > 0)
+    .map((row) => ({
+      id: row.id,
+      dueDate: row.dueDate,
+      amount: parseFloat(row.amount) || 0,
+      paidAmount: parseFloat(row.paidAmount) || 0,
+    }))
+    .sort((left, right) => left.dueDate.localeCompare(right.dueDate));
+
+const getScheduleMetadata = (rows: LoanScheduleFormRow[]) => {
+  const repaymentSchedule = normalizeScheduleRows(rows);
+  const totalAmount = repaymentSchedule.reduce((sum, row) => sum + row.amount, 0);
+  const startDate = repaymentSchedule[0]?.dueDate ?? '';
+  const endDate = repaymentSchedule[repaymentSchedule.length - 1]?.dueDate ?? '';
+  const dueDay = startDate ? new Date(`${startDate}T00:00:00`).getDate() : 1;
+  const monthlyPayment = repaymentSchedule.length > 0 ? totalAmount / repaymentSchedule.length : 0;
+
+  return {
+    repaymentSchedule,
+    totalAmount,
+    startDate,
+    endDate,
+    dueDay,
+    monthlyPayment,
+  };
+};
+
+const parseDateInput = (value: string) => {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatDateInput = (value: Date) => value.toISOString().slice(0, 10);
+
+const buildEqualMonthlyRows = (
+  startDate: string,
+  endDate: string,
+  monthlyPayment: string,
+  existingRows: LoanScheduleFormRow[] = [],
+) => {
+  const parsedStartDate = parseDateInput(startDate);
+  const parsedEndDate = parseDateInput(endDate);
+  const amount = parseFloat(monthlyPayment) || 0;
+
+  if (!parsedStartDate || !parsedEndDate || parsedStartDate > parsedEndDate || amount <= 0) return [];
+
+  const normalizedExisting = normalizeScheduleRows(existingRows);
+  const paidByDate = new Map(normalizedExisting.map((row) => [row.dueDate, row.paidAmount]));
+  const idByDate = new Map(existingRows.map((row) => [row.dueDate, row.id]));
+  const scheduleRows: LoanScheduleFormRow[] = [];
+  const dueDay = parsedStartDate.getDate();
+  let cursor = new Date(parsedStartDate.getTime());
+
+  for (let index = 0; index < 600 && cursor <= parsedEndDate; index += 1) {
+    const dueDate = formatDateInput(cursor);
+    const existingPaid = paidByDate.get(dueDate) ?? 0;
+    scheduleRows.push(
+      createScheduleRow({
+        id: idByDate.get(dueDate) ?? undefined,
+        dueDate,
+        amount: String(amount),
+        paidAmount: String(Math.min(amount, Math.max(0, existingPaid))),
+      }),
+    );
+
+    const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+    const lastDay = new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate();
+    cursor = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), Math.min(dueDay, lastDay));
+  }
+
+  return scheduleRows;
+};
 
 export default function LoansPage() {
   const { loans, addLoan, updateLoan, deleteLoan, logLoanPayment, currency } = useFinanceStore();
@@ -22,31 +115,75 @@ export default function LoansPage() {
   // Add form
   const [name, setName] = useState('');
   const [total, setTotal] = useState('0');
-  const [monthly, setMonthly] = useState('0');
-  const [interest, setInterest] = useState('0');
-  const [startDate, setStartDate] = useState('');
-  const [dueDate, setDueDate] = useState('');
+  const [paid, setPaid] = useState('0');
+  const [scheduleRows, setScheduleRows] = useState<LoanScheduleFormRow[]>([createScheduleRow()]);
   const [loanType, setLoanType] = useState<'loan' | 'installment'>('loan');
+  const [sameMonthlyPayment, setSameMonthlyPayment] = useState(true);
+  const [scheduleStartDate, setScheduleStartDate] = useState('');
+  const [scheduleEndDate, setScheduleEndDate] = useState('');
+  const [scheduleMonthlyPayment, setScheduleMonthlyPayment] = useState('');
 
   // Edit form
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editTotal, setEditTotal] = useState('0');
   const [editPaid, setEditPaid] = useState('0');
-  const [editMonthly, setEditMonthly] = useState('0');
-  const [editInterest, setEditInterest] = useState('0');
-  const [editStartDate, setEditStartDate] = useState('');
-  const [editDueDate, setEditDueDate] = useState('');
+  const [editScheduleRows, setEditScheduleRows] = useState<LoanScheduleFormRow[]>([createScheduleRow()]);
   const [editType, setEditType] = useState<'loan' | 'installment'>('loan');
+  const [editSameMonthlyPayment, setEditSameMonthlyPayment] = useState(true);
+  const [editScheduleStartDate, setEditScheduleStartDate] = useState('');
+  const [editScheduleEndDate, setEditScheduleEndDate] = useState('');
+  const [editScheduleMonthlyPayment, setEditScheduleMonthlyPayment] = useState('');
   const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
+
+  const addGeneratedRows = buildEqualMonthlyRows(
+    scheduleStartDate,
+    scheduleEndDate,
+    scheduleMonthlyPayment,
+    scheduleRows,
+  );
+  const editGeneratedRows = buildEqualMonthlyRows(
+    editScheduleStartDate,
+    editScheduleEndDate,
+    editScheduleMonthlyPayment,
+    editScheduleRows,
+  );
+  const addSourceRows = sameMonthlyPayment ? addGeneratedRows : scheduleRows;
+  const editSourceRows = editSameMonthlyPayment ? editGeneratedRows : editScheduleRows;
 
   const handleAdd = () => {
     if (!name) return;
-    addLoan({
-      name, totalAmount: parseFloat(total), paidAmount: 0, monthlyPayment: parseFloat(monthly),
-      interestRate: parseFloat(interest) || 0, startDate, dueDate, type: loanType,
+    const scheduleMetadata = getScheduleMetadata(addSourceRows);
+    if (scheduleMetadata.repaymentSchedule.length === 0) return;
+    const monthlyInterestRate = deriveLoanMonthlyInterestRate({
+      totalAmount: parseFloat(total) || 0,
+      monthlyPayment: scheduleMetadata.monthlyPayment,
+      startDate: scheduleMetadata.startDate,
+      endDate: scheduleMetadata.endDate,
+      dueDay: scheduleMetadata.dueDay,
+      repaymentSchedule: scheduleMetadata.repaymentSchedule,
     });
-    setName(''); setTotal('0'); setMonthly('0'); setInterest('0'); setShowAdd(false);
+    addLoan({
+      name,
+      totalAmount: parseFloat(total),
+      paidAmount: parseFloat(paid) || 0,
+      monthlyPayment: scheduleMetadata.monthlyPayment,
+      monthlyInterestRate,
+      startDate: scheduleMetadata.startDate,
+      dueDay: scheduleMetadata.dueDay,
+      endDate: scheduleMetadata.endDate,
+      repaymentSchedule: scheduleMetadata.repaymentSchedule,
+      type: loanType,
+    });
+    setName('');
+    setTotal('0');
+    setPaid('0');
+    setScheduleRows([createScheduleRow()]);
+    setSameMonthlyPayment(true);
+    setScheduleStartDate('');
+    setScheduleEndDate('');
+    setScheduleMonthlyPayment('');
+    setShowAdd(false);
   };
 
   const openEdit = (id: string) => {
@@ -56,23 +193,45 @@ export default function LoansPage() {
     setEditName(l.name);
     setEditTotal(String(l.totalAmount));
     setEditPaid(String(l.paidAmount));
-    setEditMonthly(String(l.monthlyPayment));
-    setEditInterest(String(l.interestRate));
-    setEditStartDate(l.startDate);
-    setEditDueDate(l.dueDate);
+    setEditScheduleRows(
+      l.repaymentSchedule.length > 0
+        ? l.repaymentSchedule.map((row) => ({
+            id: row.id,
+            dueDate: row.dueDate,
+            amount: String(row.amount),
+            paidAmount: String(row.paidAmount),
+          }))
+        : [createScheduleRow()],
+    );
     setEditType(l.type);
+    setEditSameMonthlyPayment(true);
+    setEditScheduleStartDate(l.startDate || '');
+    setEditScheduleEndDate(l.endDate || '');
+    setEditScheduleMonthlyPayment(l.monthlyPayment > 0 ? String(l.monthlyPayment) : '');
   };
 
   const handleEdit = () => {
     if (!editId || !editName) return;
+    const scheduleMetadata = getScheduleMetadata(editSourceRows);
+    if (scheduleMetadata.repaymentSchedule.length === 0) return;
+    const monthlyInterestRate = deriveLoanMonthlyInterestRate({
+      totalAmount: parseFloat(editTotal) || 0,
+      monthlyPayment: scheduleMetadata.monthlyPayment,
+      startDate: scheduleMetadata.startDate,
+      endDate: scheduleMetadata.endDate,
+      dueDay: scheduleMetadata.dueDay,
+      repaymentSchedule: scheduleMetadata.repaymentSchedule,
+    });
     updateLoan(editId, {
       name: editName,
       totalAmount: parseFloat(editTotal) || 0,
       paidAmount: parseFloat(editPaid) || 0,
-      monthlyPayment: parseFloat(editMonthly) || 0,
-      interestRate: parseFloat(editInterest) || 0,
-      startDate: editStartDate,
-      dueDate: editDueDate,
+      monthlyPayment: scheduleMetadata.monthlyPayment,
+      monthlyInterestRate,
+      startDate: scheduleMetadata.startDate,
+      dueDay: scheduleMetadata.dueDay,
+      endDate: scheduleMetadata.endDate,
+      repaymentSchedule: scheduleMetadata.repaymentSchedule,
       type: editType,
     });
     setEditId(null);
@@ -80,7 +239,12 @@ export default function LoansPage() {
 
   const handlePay = () => {
     if (!payLoanId || !payAmount) return;
-    logLoanPayment(payLoanId, parseFloat(payAmount), payNote || undefined);
+    const loan = loans.find((item) => item.id === payLoanId);
+    if (!loan) return;
+    const remaining = Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount);
+    const paymentAmount = Math.min(parseFloat(payAmount) || 0, remaining);
+    if (paymentAmount <= 0) return;
+    logLoanPayment(payLoanId, paymentAmount, payNote || undefined);
     setPayAmount(''); setPayNote(''); setPayLoanId(null);
   };
 
@@ -98,33 +262,125 @@ export default function LoansPage() {
 
   const activeLoans = loans.filter((l) => l.type === 'loan');
   const installments = loans.filter((l) => l.type === 'installment');
-  const totalOutstanding = loans.reduce((sum, loan) => sum + Math.max(0, loan.totalAmount - loan.paidAmount), 0);
+  const getLoanProgressPct = (loan: (typeof loans)[number]) => {
+    const totalWithInterest = getLoanTotalWithInterest(loan);
+    return totalWithInterest > 0 ? Math.min(100, Math.round((loan.paidAmount / totalWithInterest) * 100)) : 0;
+  };
+  const totalOutstanding = loans.reduce((sum, loan) => sum + Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount), 0);
   const totalMonthly = loans.reduce((sum, loan) => sum + loan.monthlyPayment, 0);
-  const averageInterest = loans.length > 0 ? loans.reduce((sum, loan) => sum + loan.interestRate, 0) / loans.length : 0;
+  const averageInterest = loans.length > 0 ? loans.reduce((sum, loan) => sum + loan.monthlyInterestRate, 0) / loans.length : 0;
   const totalLoanCount = loans.length;
+  const addScheduleMetadata = getScheduleMetadata(addSourceRows);
+  const editScheduleMetadata = getScheduleMetadata(editSourceRows);
+  const addMonthlyInterestRate = deriveLoanMonthlyInterestRate({
+    totalAmount: parseFloat(total) || 0,
+    monthlyPayment: addScheduleMetadata.monthlyPayment,
+    startDate: addScheduleMetadata.startDate,
+    endDate: addScheduleMetadata.endDate,
+    dueDay: addScheduleMetadata.dueDay,
+    repaymentSchedule: addScheduleMetadata.repaymentSchedule,
+  });
+  const editMonthlyInterestRate = deriveLoanMonthlyInterestRate({
+    totalAmount: parseFloat(editTotal) || 0,
+    monthlyPayment: editScheduleMetadata.monthlyPayment,
+    startDate: editScheduleMetadata.startDate,
+    endDate: editScheduleMetadata.endDate,
+    dueDay: editScheduleMetadata.dueDay,
+    repaymentSchedule: editScheduleMetadata.repaymentSchedule,
+  });
+  const formatMonthlyInterestRate = (value: number) => `${value.toFixed(2)}%`;
+  const formatMonthDay = (value: Date | null) =>
+    value ? new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(value) : 'Completed';
+  const renderScheduleEditor = (
+    title: string,
+    rows: LoanScheduleFormRow[],
+    setRows: Dispatch<SetStateAction<LoanScheduleFormRow[]>>,
+  ) => {
+    const normalizedRows = normalizeScheduleRows(rows);
+    const totalDue = normalizedRows.reduce((sum, row) => sum + row.amount, 0);
+    const averageAmount = normalizedRows.length > 0 ? totalDue / normalizedRows.length : 0;
+
+    return (
+      <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <Label>{title}</Label>
+            <p className="text-xs text-muted-foreground">Add one row per due month with its own amount.</p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setRows((current) => [...current, createScheduleRow()])}
+          >
+            Add row
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {rows.map((row, index) => (
+            <div key={row.id} className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+              <div className="space-y-1.5">
+                <Label>Due date {index + 1}</Label>
+                <Input
+                  type="date"
+                  value={row.dueDate}
+                  onChange={(e) =>
+                    setRows((current) => current.map((item) => (item.id === row.id ? { ...item, dueDate: e.target.value } : item)))
+                  }
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Amount</Label>
+                <Input
+                  placeholder="0.00"
+                  type="number"
+                  value={row.amount}
+                  onChange={(e) =>
+                    setRows((current) => current.map((item) => (item.id === row.id ? { ...item, amount: e.target.value } : item)))
+                  }
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 text-muted-foreground"
+                  disabled={(parseFloat(row.paidAmount) || 0) > 0}
+                  title={(parseFloat(row.paidAmount) || 0) > 0 ? 'Paid rows cannot be removed' : 'Remove row'}
+                  onClick={() => setRows((current) => (current.length > 1 ? current.filter((item) => item.id !== row.id) : current))}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+          <div>Total due: {currency}{totalDue.toLocaleString()}</div>
+          <div>Average payment: {currency}{averageAmount.toLocaleString()}</div>
+        </div>
+      </div>
+    );
+  };
 
   const renderLoanCard = (l: typeof loans[0]) => {
-    const pct = Math.min(100, Math.round((l.paidAmount / l.totalAmount) * 100));
-    const remaining = l.totalAmount - l.paidAmount;
-
-    let formattedDue = '-';
-    if (l.dueDate) {
-      const parts = l.dueDate.split('-');
-      if (parts.length === 3) {
-        const [y, m, d] = parts;
-        const dateObj = new Date(Number(y), Number(m) - 1, Number(d));
-        if (!isNaN(dateObj.getTime())) {
-          formattedDue = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(dateObj);
-        }
-      }
-    }
+    const totalWithInterest = getLoanTotalWithInterest(l);
+    const pct = getLoanProgressPct(l);
+    const remaining = Math.max(0, totalWithInterest - l.paidAmount);
+    const nextDue = getLoanNextDueDate(l);
+    const nextDueAmount = getLoanNextDueAmount(l);
+    const formattedNextDue = formatMonthDay(nextDue);
+    const formattedNextDueAmount = nextDue ? `${currency}${nextDueAmount.toLocaleString()}` : '—';
 
     return (
       <div key={l.id} className="glass-card rounded-xl p-5 animate-fade-in">
         <div className="flex items-start justify-between mb-3">
           <div>
             <p className="font-heading font-semibold text-foreground">{l.name}</p>
-            <p className="text-xs text-muted-foreground capitalize">{l.type} {l.interestRate > 0 && `· ${l.interestRate}% APR`}</p>
+            <p className="text-xs text-muted-foreground capitalize">
+              {l.type} {l.monthlyInterestRate > 0 && `· ${formatMonthlyInterestRate(l.monthlyInterestRate)} monthly`}
+            </p>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="icon" className="h-7 w-7 text-primary" onClick={() => setPayLoanId(l.id)}>
@@ -146,7 +402,7 @@ export default function LoansPage() {
           <Progress value={pct} className="h-2.5" />
           <div className="flex justify-between text-xs text-muted-foreground">
             <span>{currency}{l.paidAmount.toLocaleString()} paid</span>
-            <span>{currency}{l.totalAmount.toLocaleString()} total</span>
+            <span>{currency}{totalWithInterest.toLocaleString()} total with interest</span>
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-border grid grid-cols-3 gap-2 text-xs">
@@ -155,12 +411,12 @@ export default function LoansPage() {
             <p className="font-medium text-foreground">{currency}{remaining.toLocaleString()}</p>
           </div>
           <div className="text-center">
-            <span className="text-muted-foreground">Monthly</span>
-            <p className="font-medium text-foreground">{currency}{l.monthlyPayment.toLocaleString()}</p>
+            <span className="text-muted-foreground">Next Amount</span>
+            <p className="font-medium text-foreground">{formattedNextDueAmount}</p>
           </div>
           <div className="text-right">
-            <span className="text-muted-foreground">Due</span>
-            <p className="font-medium text-foreground">{formattedDue}</p>
+            <span className="text-muted-foreground">Next Due</span>
+            <p className="font-medium text-foreground">{formattedNextDue}</p>
           </div>
         </div>
       </div>
@@ -173,7 +429,23 @@ export default function LoansPage() {
         title="Loans & Installments"
         description="Track your loans and log payments"
         actions={
-        <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <Dialog
+          open={showAdd}
+          onOpenChange={(open) => {
+            setShowAdd(open);
+            if (open) {
+              setName('');
+              setTotal('0');
+              setPaid('0');
+              setScheduleRows([createScheduleRow()]);
+              setLoanType('loan');
+              setSameMonthlyPayment(true);
+              setScheduleStartDate('');
+              setScheduleEndDate('');
+              setScheduleMonthlyPayment('');
+            }
+          }}
+        >
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Loan/Installment</Button>
           </DialogTrigger>
@@ -193,26 +465,59 @@ export default function LoansPage() {
                     <SelectItem value="installment">Installment</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Total amount (without interest)</Label>
+              <Input placeholder="0.00" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
+            </div>
               <div className="space-y-1.5">
-                <Label>Total amount</Label>
-                <Input placeholder="0.00" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
+                <Label>Paid amount</Label>
+                <Input placeholder="0.00" type="number" value={paid} onChange={(e) => setPaid(e.target.value)} />
               </div>
-              <div className="space-y-1.5">
-                <Label>Monthly payment</Label>
-                <Input placeholder="0.00" type="number" value={monthly} onChange={(e) => setMonthly(e.target.value)} />
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <Label>Same monthly payment</Label>
+                    <p className="text-xs text-muted-foreground">Default is same monthly payment. Turn this off to enter a detailed repayment schedule.</p>
+                  </div>
+                  <Switch checked={sameMonthlyPayment} onCheckedChange={setSameMonthlyPayment} />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <Label>Interest rate %</Label>
-                <Input placeholder="0" type="number" value={interest} onChange={(e) => setInterest(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Start date</Label>
-                <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Due date</Label>
-                <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+              {sameMonthlyPayment ? (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                  <Label>Monthly payment plan</Label>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Start date</Label>
+                      <Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>End date</Label>
+                      <Input type="date" value={scheduleEndDate} onChange={(e) => setScheduleEndDate(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Monthly payment</Label>
+                    <Input
+                      placeholder="0.00"
+                      type="number"
+                      value={scheduleMonthlyPayment}
+                      onChange={(e) => setScheduleMonthlyPayment(e.target.value)}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Generated {addGeneratedRows.length} payment{addGeneratedRows.length === 1 ? '' : 's'} at {currency}
+                    {(parseFloat(scheduleMonthlyPayment) || 0).toLocaleString()} each.
+                  </p>
+                </div>
+              ) : (
+                renderScheduleEditor('Repayment schedule', scheduleRows, setScheduleRows)
+              )}
+              <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3">
+                <Label>Effective monthly interest rate</Label>
+                <p className="mt-1 text-sm font-medium text-foreground">
+                  {addMonthlyInterestRate > 0 ? `${addMonthlyInterestRate.toFixed(2)}%` : 'Auto-calculated after you add repayment rows'}
+                </p>
               </div>
               <Button className="w-full mt-2" onClick={handleAdd}>Create</Button>
             </div>
@@ -241,7 +546,7 @@ export default function LoansPage() {
           icon={<CalendarClock className="h-5 w-5" />}
         />
         <StatCard
-          title="Average APR"
+          title="Average monthly rate"
           value={`${averageInterest.toFixed(1)}%`}
           subtitle="Across all loans"
           icon={<Percent className="h-5 w-5" />}
@@ -286,28 +591,61 @@ export default function LoansPage() {
               </Select>
             </div>
             <div className="space-y-1.5">
-              <Label>Total amount</Label>
+              <Label>Total amount (without interest)</Label>
               <Input placeholder="0.00" type="number" value={editTotal} onChange={(e) => setEditTotal(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>Paid amount</Label>
               <Input placeholder="0.00" type="number" value={editPaid} onChange={(e) => setEditPaid(e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <Label>Monthly payment</Label>
-              <Input placeholder="0.00" type="number" value={editMonthly} onChange={(e) => setEditMonthly(e.target.value)} />
+            <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <Label>Same monthly payment</Label>
+                  <p className="text-xs text-muted-foreground">Default is same monthly payment. Turn this off to enter a detailed repayment schedule.</p>
+                </div>
+                <Switch checked={editSameMonthlyPayment} onCheckedChange={setEditSameMonthlyPayment} />
+              </div>
             </div>
-            <div className="space-y-1.5">
-              <Label>Interest rate %</Label>
-              <Input placeholder="0" type="number" value={editInterest} onChange={(e) => setEditInterest(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Start date</Label>
-              <Input type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Due date</Label>
-              <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+            {editSameMonthlyPayment ? (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                <Label>Monthly payment plan</Label>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label>Start date</Label>
+                    <Input
+                      type="date"
+                      value={editScheduleStartDate}
+                      onChange={(e) => setEditScheduleStartDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>End date</Label>
+                    <Input type="date" value={editScheduleEndDate} onChange={(e) => setEditScheduleEndDate(e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Monthly payment</Label>
+                  <Input
+                    placeholder="0.00"
+                    type="number"
+                    value={editScheduleMonthlyPayment}
+                    onChange={(e) => setEditScheduleMonthlyPayment(e.target.value)}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Generated {editGeneratedRows.length} payment{editGeneratedRows.length === 1 ? '' : 's'} at {currency}
+                  {(parseFloat(editScheduleMonthlyPayment) || 0).toLocaleString()} each.
+                </p>
+              </div>
+            ) : (
+              renderScheduleEditor('Repayment schedule', editScheduleRows, setEditScheduleRows)
+            )}
+            <div className="space-y-1.5 rounded-lg border border-border bg-muted/30 p-3">
+              <Label>Effective monthly interest rate</Label>
+              <p className="mt-1 text-sm font-medium text-foreground">
+                {editMonthlyInterestRate > 0 ? `${editMonthlyInterestRate.toFixed(2)}%` : 'Auto-calculated after you set the repayment schedule'}
+              </p>
             </div>
             <Button className="w-full mt-2" onClick={handleEdit}>Save Changes</Button>
           </div>
