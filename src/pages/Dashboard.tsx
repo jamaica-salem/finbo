@@ -1,4 +1,12 @@
 import { useFinanceStore } from '@/store/financeStore';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { toast } from 'sonner';
+import { buildTransactionCategoryOptions } from '@/lib/transactionCategories';
+import { useState, useMemo } from 'react';
 import { StatCard } from '@/components/StatCard';
 import { PageHeader } from '@/components/PageHeader';
 import { PhilippinePeso, Receipt, TrendingUp, CreditCard, CalendarClock } from 'lucide-react';
@@ -17,7 +25,133 @@ const getCategories = (transaction: { category: string; categories?: string[] })
   (transaction.categories && transaction.categories.length > 0 ? transaction.categories : [transaction.category]).filter(Boolean);
 
 export default function Dashboard() {
-  const { accounts, transactions, loans, bills, creditCards, recurringTransactionRules, currency, categoryColors } = useFinanceStore();
+  const { accounts, transactions, loans, bills, creditCards, recurringTransactionRules, currency, categoryColors, transactionCategories, sharedCategories, addTransaction, addBill, logLoanPayment, logCreditCardPayment, markBillPaid } = useFinanceStore();
+
+  // Quick actions state
+  const [showAddExpense, setShowAddExpense] = useState(false);
+  const [qeAccount, setQeAccount] = useState(accounts[0]?.id ?? '');
+  const [qeAmount, setQeAmount] = useState('0');
+  const [qeCategory, setQeCategory] = useState('');
+  const [qeDate, setQeDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const [showAddIncome, setShowAddIncome] = useState(false);
+  const [qiAccount, setQiAccount] = useState(accounts[0]?.id ?? '');
+  const [qiAmount, setQiAmount] = useState('0');
+  const [qiCategory, setQiCategory] = useState('');
+  const [qiDate, setQiDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const [showAddBillQuick, setShowAddBillQuick] = useState(false);
+  const [qbName, setQbName] = useState('');
+  const [qbAmount, setQbAmount] = useState('0');
+  const [qbCategory, setQbCategory] = useState('');
+  const [qbDueDate, setQbDueDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const [showLogPayment, setShowLogPayment] = useState(false);
+  const [lpType, setLpType] = useState<'loan' | 'creditCard' | 'bill'>('loan');
+  const [lpLoanId, setLpLoanId] = useState(loans[0]?.id ?? '');
+  const [lpCardId, setLpCardId] = useState(creditCards[0]?.id ?? '');
+  const [lpBillId, setLpBillId] = useState(bills[0]?.id ?? '');
+  const [lpAmount, setLpAmount] = useState('0');
+  const [lpNote, setLpNote] = useState('');
+  const [lpBillDate, setLpBillDate] = useState(new Date().toISOString().slice(0, 10));
+
+  const categoryOptions = useMemo(() => buildTransactionCategoryOptions(transactions, transactionCategories, sharedCategories), [transactions, transactionCategories, sharedCategories]);
+
+  const handleAddExpenseQuick = () => {
+    if (!qeAccount) {
+      toast.error('Select an account first');
+      return;
+    }
+    const amount = Math.abs(parseFloat(qeAmount) || 0);
+    if (amount <= 0) {
+      toast.error('Enter an amount greater than 0');
+      return;
+    }
+    addTransaction({
+      accountId: qeAccount,
+      type: 'expense',
+      amount,
+      category: qeCategory || 'Other',
+      categories: qeCategory ? [qeCategory] : ['Other'],
+      description: '',
+      date: qeDate,
+    });
+    setShowAddExpense(false);
+    setQeAmount('0');
+    setQeCategory('');
+    toast.success('Expense added');
+  };
+
+  const handleAddIncomeQuick = () => {
+    if (!qiAccount) {
+      toast.error('Select an account first');
+      return;
+    }
+    const amount = Math.abs(parseFloat(qiAmount) || 0);
+    if (amount <= 0) {
+      toast.error('Enter an amount greater than 0');
+      return;
+    }
+    addTransaction({
+      accountId: qiAccount,
+      type: 'income',
+      amount,
+      category: qiCategory || 'Other',
+      categories: qiCategory ? [qiCategory] : ['Other'],
+      description: '',
+      date: qiDate,
+    });
+    setShowAddIncome(false);
+    setQiAmount('0');
+    setQiCategory('');
+    toast.success('Income added');
+  };
+
+  const handleAddBillQuick = () => {
+    const amount = Math.abs(parseFloat(qbAmount) || 0);
+    if (!qbName || amount <= 0) {
+      toast.error('Please enter a name and valid amount');
+      return;
+    }
+    addBill({ name: qbName, amount, category: qbCategory || 'Other', dueDate: qbDueDate, recurring: false, status: 'pending' });
+    setShowAddBillQuick(false);
+    setQbName(''); setQbAmount('0'); setQbCategory('');
+    toast.success('Bill added');
+  };
+
+  const handleLogPaymentQuick = () => {
+    const amount = Math.abs(parseFloat(lpAmount) || 0);
+    if (lpType === 'loan') {
+      if (!lpLoanId || amount <= 0) {
+        toast.error('Select a loan and enter a valid amount');
+        return;
+      }
+      logLoanPayment(lpLoanId, amount, lpNote || undefined);
+      toast.success('Loan payment logged');
+    }
+
+    if (lpType === 'creditCard') {
+      if (!lpCardId || amount <= 0) {
+        toast.error('Select a card and enter a valid amount');
+        return;
+      }
+      logCreditCardPayment(lpCardId, amount, lpNote || undefined);
+      toast.success('Credit card payment logged');
+    }
+
+    if (lpType === 'bill') {
+      if (!lpBillId) {
+        toast.error('Select a bill');
+        return;
+      }
+      // for bills we record the paid date (may be different than today)
+      markBillPaid(lpBillId, lpBillDate);
+      toast.success('Bill payment logged');
+    }
+
+    setShowLogPayment(false);
+    setLpAmount('0'); setLpNote('');
+  };
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
@@ -107,6 +241,204 @@ export default function Dashboard() {
       <PageHeader
         title="Dashboard"
         description="Your financial overview at a glance"
+        actions={
+          <div className="flex items-center gap-2">
+            <Dialog open={showAddExpense} onOpenChange={setShowAddExpense}>
+              <DialogTrigger asChild>
+                <Button size="sm">Add expense</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Add expense</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Account</Label>
+                    <Select value={qeAccount} onValueChange={setQeAccount}>
+                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Amount</Label>
+                    <Input type="number" value={qeAmount} onChange={(e) => setQeAmount(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Category</Label>
+                    <Select value={qeCategory} onValueChange={setQeCategory}>
+                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Date</Label>
+                    <Input type="date" value={qeDate} onChange={(e) => setQeDate(e.target.value)} />
+                  </div>
+                  <Button className="w-full" onClick={handleAddExpenseQuick}>Save expense</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showAddIncome} onOpenChange={setShowAddIncome}>
+              <DialogTrigger asChild>
+                <Button size="sm">Add income</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Add income</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Account</Label>
+                    <Select value={qiAccount} onValueChange={setQiAccount}>
+                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Amount</Label>
+                    <Input type="number" value={qiAmount} onChange={(e) => setQiAmount(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Category</Label>
+                    <Select value={qiCategory} onValueChange={setQiCategory}>
+                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Date</Label>
+                    <Input type="date" value={qiDate} onChange={(e) => setQiDate(e.target.value)} />
+                  </div>
+                  <Button className="w-full" onClick={handleAddIncomeQuick}>Save income</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showAddBillQuick} onOpenChange={setShowAddBillQuick}>
+              <DialogTrigger asChild>
+                <Button size="sm">Add bill</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Add bill</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Name</Label>
+                    <Input value={qbName} onChange={(e) => setQbName(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Amount</Label>
+                    <Input type="number" value={qbAmount} onChange={(e) => setQbAmount(e.target.value)} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Category</Label>
+                    <Select value={qbCategory} onValueChange={setQbCategory}>
+                      <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Due date</Label>
+                    <Input type="date" value={qbDueDate} onChange={(e) => setQbDueDate(e.target.value)} />
+                  </div>
+                  <Button className="w-full" onClick={handleAddBillQuick}>Save bill</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={showLogPayment} onOpenChange={setShowLogPayment}>
+              <DialogTrigger asChild>
+                <Button size="sm">Log payment</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Log payment</DialogTitle></DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Type</Label>
+                    <Select value={lpType} onValueChange={(v) => setLpType(v as any)}>
+                      <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="loan">Loan</SelectItem>
+                        <SelectItem value="creditCard">Credit Card</SelectItem>
+                        <SelectItem value="bill">Bill</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {lpType === 'loan' && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label>Loan</Label>
+                        <Select value={lpLoanId} onValueChange={setLpLoanId}>
+                          <SelectTrigger><SelectValue placeholder="Select loan" /></SelectTrigger>
+                          <SelectContent>
+                            {loans.map((l) => <SelectItem key={l.id} value={l.id}>{l.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Amount</Label>
+                        <Input type="number" value={lpAmount} onChange={(e) => setLpAmount(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Note</Label>
+                        <Input value={lpNote} onChange={(e) => setLpNote(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {lpType === 'creditCard' && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label>Card</Label>
+                        <Select value={lpCardId} onValueChange={setLpCardId}>
+                          <SelectTrigger><SelectValue placeholder="Select card" /></SelectTrigger>
+                          <SelectContent>
+                            {creditCards.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Amount</Label>
+                        <Input type="number" value={lpAmount} onChange={(e) => setLpAmount(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Note</Label>
+                        <Input value={lpNote} onChange={(e) => setLpNote(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  {lpType === 'bill' && (
+                    <>
+                      <div className="space-y-1.5">
+                        <Label>Bill</Label>
+                        <Select value={lpBillId} onValueChange={setLpBillId}>
+                          <SelectTrigger><SelectValue placeholder="Select bill" /></SelectTrigger>
+                          <SelectContent>
+                            {bills.map((b) => <SelectItem key={b.id} value={b.id}>{b.name} — {formatDueDate(b.dueDate)}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Paid date</Label>
+                        <Input type="date" value={lpBillDate} onChange={(e) => setLpBillDate(e.target.value)} />
+                      </div>
+                    </>
+                  )}
+
+                  <Button className="w-full" onClick={handleLogPaymentQuick}>Log payment</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        }
       />
 
       {/* Stats Grid */}
@@ -130,6 +462,23 @@ export default function Dashboard() {
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
+          title="Monthly Payments"
+          value={`${currency}${totalMonthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Bills + loans + installments + credit cards + recurring expenses"
+          icon={<Receipt className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Net"
+          value={`${currency}${netAfterDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          valueClassName={netValueClassName}
+          subtitle={netSubtitle}
+          className={netCardClassName}
+          icon={<TrendingUp className="h-5 w-5" />}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
           title="Total Loans"
           value={`${currency}${totalLoanRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
           subtitle={`${totalLoansCount} loan${totalLoansCount === 1 ? '' : 's'}`}
@@ -141,33 +490,16 @@ export default function Dashboard() {
           subtitle={`${totalInstallmentsCount} installment${totalInstallmentsCount === 1 ? '' : 's'}`}
           icon={<CalendarClock className="h-5 w-5" />}
         />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Monthly Payments"
-          value={`${currency}${totalMonthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle="Bills + loans + installments + credit cards + recurring expenses"
-          icon={<Receipt className="h-5 w-5" />}
+          title="Credit Cards"
+          value={`${currency}${totalCreditCardDebt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle={`${creditCards.length} card${creditCards.length === 1 ? '' : 's'}`}
+          icon={<CreditCard className="h-5 w-5" />}
         />
         <StatCard
           title="Total Debts"
           value={`${currency}${totalDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
           subtitle="Loans + installments + credit cards"
-          icon={<CreditCard className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Net"
-          value={`${currency}${netAfterDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          valueClassName={netValueClassName}
-          subtitle={netSubtitle}
-          className={netCardClassName}
-          icon={<TrendingUp className="h-5 w-5" />}
-        />
-        <StatCard
-          title="Credit Cards"
-          value={`${currency}${totalCreditCardDebt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle={`${creditCards.length} card${creditCards.length === 1 ? '' : 's'}`}
           icon={<CreditCard className="h-5 w-5" />}
         />
       </div>
