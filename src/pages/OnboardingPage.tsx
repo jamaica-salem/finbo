@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Sparkles, Wallet, BarChart3, Gift, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Sparkles, Wallet, BarChart3, Folder, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Progress } from '@/components/ui/progress';
@@ -32,6 +32,7 @@ const steps = [
 export default function OnboardingPage() {
   const { currency, replaceFinanceData, accounts, transactions, budgets } = useFinanceStore();
   const [showSampleConfirm, setShowSampleConfirm] = useState(false);
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
 
   const hasAccount = accounts.length > 0;
   const hasTransaction = transactions.length > 0;
@@ -43,6 +44,30 @@ export default function OnboardingPage() {
     replaceFinanceData(generateSampleFinanceData(currency));
     setShowSampleConfirm(false);
     toast.success('Sample data loaded.');
+  };
+
+  const handleRemoveSampleData = () => {
+    replaceFinanceData({
+      accounts: [],
+      transactions: [],
+      recurringTransactionRules: [],
+      categoryRules: [],
+      transactionCategories: [],
+      savingsCategories: [],
+      sharedCategories: [],
+      budgets: [],
+      categoryColors: {},
+      loans: [],
+      loanPayments: [],
+      creditCards: [],
+      creditCardActivities: [],
+      bills: [],
+      savingsGoals: [],
+      savingsGoalContributions: [],
+      currency,
+    });
+    setShowRemoveConfirm(false);
+    toast.success('Sample data removed.');
   };
 
   return (
@@ -154,7 +179,7 @@ export default function OnboardingPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Gift className="h-5 w-5 text-primary" />
+              <Folder className="h-5 w-5 text-primary" />
               Try sample data
             </CardTitle>
             <CardDescription>Load a demo set if you want to see Finbo in action without entering everything by hand.</CardDescription>
@@ -163,10 +188,15 @@ export default function OnboardingPage() {
             <p className="text-sm text-muted-foreground">
               This replaces your current data with a realistic starter set that includes accounts, transactions, budgets, bills, loans, cards, and savings goals.
             </p>
-            <Button onClick={() => setShowSampleConfirm(true)}>
-              Load sample data
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setShowSampleConfirm(true)}>
+                Load sample data
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+              <Button variant="destructive" onClick={() => setShowRemoveConfirm(true)}>
+                Remove sample data
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -180,13 +210,7 @@ export default function OnboardingPage() {
             <p>2. Log a few transactions.</p>
             <p>3. Create a budget or savings goal.</p>
             <p>4. Review analytics after a few entries.</p>
-            <p>
-              If you want to remove the sample data and start fresh later, open{' '}
-              <Link to="/security" className="font-medium text-primary underline-offset-4 hover:underline">
-                Security
-              </Link>{' '}
-              and use reset data.
-            </p>
+            {/* Removed reference to resetting sample data here per design change */}
           </CardContent>
         </Card>
       </div>
@@ -199,6 +223,16 @@ export default function OnboardingPage() {
         confirmLabel="Load sample data"
         destructive={false}
         onConfirm={handleLoadSampleData}
+      />
+
+      <ConfirmDialog
+        open={showRemoveConfirm}
+        onOpenChange={setShowRemoveConfirm}
+        title="Remove sample data?"
+        description="This will clear all your current finance data."
+        confirmLabel="Remove sample data"
+        destructive={true}
+        onConfirm={handleRemoveSampleData}
       />
     </div>
   );
