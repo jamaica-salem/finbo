@@ -11,6 +11,7 @@ import type {
   Transaction,
 } from '@/types/finance';
 import { CATEGORY_COLOR_PALETTE } from '@/lib/transactionCategories';
+import { deriveLoanMonthlyInterestRate } from '@/lib/interest';
 
 const uid = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
 const today = new Date();
@@ -148,16 +149,33 @@ export const generateSampleFinanceData = (currency = '₱'): FinanceDataState =>
     },
   ];
 
+  const motorLoanSchedule = [
+    { id: uid('sched'), dueDate: isoDaysFromNow(25), amount: 48000, paidAmount: 42000 },
+    { id: uid('sched'), dueDate: isoDaysFromNow(55), amount: 52000, paidAmount: 0 },
+    { id: uid('sched'), dueDate: isoDaysFromNow(85), amount: 56000, paidAmount: 0 },
+    { id: uid('sched'), dueDate: isoDaysFromNow(115), amount: 54000, paidAmount: 0 },
+  ];
+  const motorLoanMonthlyPayment = motorLoanSchedule.reduce((sum, entry) => sum + entry.amount, 0) / motorLoanSchedule.length;
+
   const loans: Loan[] = [
     {
       id: uid('loan'),
       name: 'Motor Loan',
       totalAmount: 180000,
       paidAmount: 42000,
-      monthlyPayment: 12000,
-      interestRate: 7.5,
-      startDate: isoDaysAgo(260),
-      dueDate: isoDaysFromNow(12),
+      monthlyPayment: motorLoanMonthlyPayment,
+      monthlyInterestRate: deriveLoanMonthlyInterestRate({
+        totalAmount: 180000,
+        monthlyPayment: motorLoanMonthlyPayment,
+        startDate: motorLoanSchedule[0].dueDate,
+        endDate: motorLoanSchedule[motorLoanSchedule.length - 1].dueDate,
+        dueDay: 15,
+        repaymentSchedule: motorLoanSchedule,
+      }),
+      startDate: motorLoanSchedule[0].dueDate,
+      dueDay: 15,
+      endDate: motorLoanSchedule[motorLoanSchedule.length - 1].dueDate,
+      repaymentSchedule: motorLoanSchedule,
       type: 'loan',
     },
   ];
@@ -169,10 +187,11 @@ export const generateSampleFinanceData = (currency = '₱'): FinanceDataState =>
       issuer: 'Finbo Bank',
       network: 'visa',
       creditLimit: 50000,
+      paidAmount: 41600,
       currentBalance: 8400,
       statementBalance: 9200,
       minimumPayment: 2500,
-      apr: 3.25,
+      monthlyInterestRate: 3.25,
       rewardsRate: 1.2,
       annualFee: 1500,
       dueDate: isoDaysFromNow(9),
