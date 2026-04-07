@@ -189,19 +189,29 @@ export default function Dashboard() {
     .filter((rule) => rule.active && rule.type === 'expense' && rule.frequency === 'monthly')
     .reduce((s, rule) => s + Math.max(0, rule.amount), 0);
 
+  const hasFinancialData =
+    accounts.length > 0 ||
+    transactions.length > 0 ||
+    loans.length > 0 ||
+    bills.length > 0 ||
+    creditCards.length > 0 ||
+    recurringTransactionRules.length > 0;
+
   const totalMonthlyPayments = totalBillsDue + totalLoanMonthlyPayments + totalInstallmentMonthlyPayments + totalCreditCardMinimumPayments + activeMonthlyRecurringExpenses;
   const totalDebts = totalLoanRemaining + totalInstallmentRemaining + totalCreditCardDebt;
   const netAfterDebts = totalBalance - totalDebts;
-  const nearNegativeNetThreshold = Math.max(1000, totalDebts * 0.1);
+  const nearNegativeNetThreshold = hasFinancialData ? Math.max(1000, totalDebts * 0.1) : 0;
   const isNetNegative = netAfterDebts < 0;
-  const isNetNearNegative = !isNetNegative && netAfterDebts <= nearNegativeNetThreshold;
+  const isNetNearNegative = hasFinancialData && !isNetNegative && netAfterDebts <= nearNegativeNetThreshold;
   const netCardClassName = isNetNegative
     ? 'border-destructive/60 bg-destructive/10'
     : isNetNearNegative
       ? 'border-warning/60 bg-warning/10'
       : undefined;
   const netValueClassName = isNetNegative ? 'text-destructive' : isNetNearNegative ? 'text-warning' : undefined;
-  const netSubtitle = isNetNegative
+  const netSubtitle = !hasFinancialData
+    ? 'Add financial data to see net insights'
+    : isNetNegative
     ? 'Alert: total debts exceed total balance'
     : isNetNearNegative
       ? 'Warning: net is close to negative'

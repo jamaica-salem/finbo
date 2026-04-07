@@ -1,5 +1,5 @@
 import { useMemo, useState, type ElementType } from 'react';
-import { Palette, Pencil, Plus, ShieldCheck, Sparkles, Tag, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Sparkles, Tag, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,14 +13,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { useFinanceStore } from '@/store/financeStore';
 import { buildTransactionCategoryOptions, getCategoryColor } from '@/lib/transactionCategories';
-import type { CategoryRuleMatchType, SavingsGoal } from '@/types/finance';
+import type { SavingsGoal } from '@/types/finance';
 
 const DEFAULT_SAVINGS_CATEGORIES = ['Vacation', 'Emergency Fund', 'Home', 'Education', 'Tech', 'Other'];
-const MATCH_TYPE_OPTIONS: Array<{ value: CategoryRuleMatchType; label: string }> = [
-  { value: 'contains', label: 'Contains' },
-  { value: 'startsWith', label: 'Starts with' },
-  { value: 'equals', label: 'Equals' },
-];
 
 const normalizeName = (value: string) => value.trim();
 
@@ -128,16 +123,12 @@ export default function CategoriesPage() {
     bills,
     savingsGoals,
     categoryColors,
-    categoryRules,
     transactionCategories,
     savingsCategories,
     sharedCategories,
     addTransactionCategory,
     addSavingsCategory,
     addSharedCategory,
-    addCategoryRule,
-    updateCategoryRule,
-    deleteCategoryRule,
     setCategoryColor,
     renameCategory,
     deleteCategory,
@@ -145,10 +136,6 @@ export default function CategoriesPage() {
 
   const [transactionCategoryInput, setTransactionCategoryInput] = useState('');
   const [savingsCategoryInput, setSavingsCategoryInput] = useState('');
-  const [rulePattern, setRulePattern] = useState('');
-  const [ruleCategory, setRuleCategory] = useState('');
-  const [ruleMatchType, setRuleMatchType] = useState<CategoryRuleMatchType>('contains');
-  const [ruleActive, setRuleActive] = useState(true);
   const [renameTarget, setRenameTarget] = useState<{ scope: 'transaction' | 'savings'; name: string } | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<{ scope: 'transaction' | 'savings'; name: string } | null>(null);
@@ -204,7 +191,6 @@ export default function CategoriesPage() {
     }));
   }, [categoryColors, savingsCategoryNames, savingsCategories, savingsGoals]);
 
-  const activeRules = categoryRules.filter((rule) => rule.active);
 
   const handleAddTransactionCategory = () => {
     const next = normalizeName(transactionCategoryInput);
@@ -263,26 +249,7 @@ export default function CategoriesPage() {
     setDeleteTarget(null);
   };
 
-  const handleAddRule = () => {
-    const nextPattern = normalizeName(rulePattern);
-    const nextCategory = normalizeName(ruleCategory);
-    if (!nextPattern || !nextCategory) {
-      toast.error('Enter a pattern and category.');
-      return;
-    }
 
-    addCategoryRule({
-      pattern: nextPattern,
-      category: nextCategory,
-      matchType: ruleMatchType,
-      active: ruleActive,
-    });
-    setRulePattern('');
-    setRuleCategory('');
-    setRuleMatchType('contains');
-    setRuleActive(true);
-    toast.success('Category rule added.');
-  };
 
   return (
     <div className="space-y-6">
@@ -291,7 +258,7 @@ export default function CategoriesPage() {
         description="Manage categories for transactions, bills, and savings in one place."
       />
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardContent className="p-5">
             <div className="flex items-center gap-2 text-sm font-medium text-foreground">
@@ -310,16 +277,6 @@ export default function CategoriesPage() {
             </div>
             <div className="mt-3 text-2xl font-semibold">{savingsStats.length}</div>
             <p className="mt-1 text-sm text-muted-foreground">Used by savings goals.</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-5">
-            <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-              <ShieldCheck className="h-4 w-4 text-primary" />
-              Active rules
-            </div>
-            <div className="mt-3 text-2xl font-semibold">{activeRules.length}</div>
-            <p className="mt-1 text-sm text-muted-foreground">Automation rules for incoming transactions.</p>
           </CardContent>
         </Card>
       </div>
@@ -358,94 +315,7 @@ export default function CategoriesPage() {
         />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Palette className="h-5 w-5 text-primary" />
-            Category rules
-          </CardTitle>
-          <CardDescription>Optional automation: map new transactions to a category when text matches.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1.5">
-              <Label>Pattern</Label>
-              <Input value={rulePattern} onChange={(e) => setRulePattern(e.target.value)} placeholder="e.g. grab, salary, netflix" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Input value={ruleCategory} onChange={(e) => setRuleCategory(e.target.value)} placeholder="e.g. Transport" list="category-options" />
-              <datalist id="category-options">
-                {mergedTransactionCategoryNames.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Match type</Label>
-              <Select value={ruleMatchType} onValueChange={(value) => setRuleMatchType(value as CategoryRuleMatchType)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MATCH_TYPE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-end justify-between gap-3 rounded-xl border border-border bg-muted/20 px-3 py-2">
-              <div>
-                <Label className="text-sm">Active</Label>
-                <p className="text-xs text-muted-foreground">Disable to keep the rule but stop matching it.</p>
-              </div>
-              <Switch checked={ruleActive} onCheckedChange={setRuleActive} />
-            </div>
-          </div>
-
-          <Button className="w-full sm:w-auto" onClick={handleAddRule}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add rule
-          </Button>
-
-          <div className="space-y-3 pt-2">
-            {categoryRules.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-border p-4 text-sm text-muted-foreground">
-                No automation rules yet.
-              </div>
-            ) : (
-              categoryRules.map((rule) => (
-                <div key={rule.id} className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-medium text-foreground">{rule.pattern}</div>
-                        <Badge variant="secondary">{rule.matchType}</Badge>
-                        <Badge variant={rule.active ? 'default' : 'outline'}>{rule.active ? 'Active' : 'Disabled'}</Badge>
-                      </div>
-                      <div className="text-sm text-muted-foreground">Maps to <span className="font-medium text-foreground">{rule.category}</span></div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-2 rounded-lg border border-border px-2 py-1">
-                        <span className="text-xs text-muted-foreground">On</span>
-                        <Switch
-                          checked={rule.active}
-                          onCheckedChange={(checked) => updateCategoryRule(rule.id, { active: checked })}
-                        />
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => deleteCategoryRule(rule.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      
 
       <Dialog open={Boolean(renameTarget)} onOpenChange={(open) => !open && setRenameTarget(null)}>
         <DialogContent>
