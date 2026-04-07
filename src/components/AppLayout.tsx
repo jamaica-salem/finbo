@@ -1,4 +1,5 @@
 import { AppSidebar } from './AppSidebar';
+import { NotificationHeader } from './NotificationHeader';
 import { useState } from 'react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -12,9 +13,12 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
       <AppSidebar collapsed={collapsed} setCollapsed={setIsSidebarCollapsed} />
       <main
         style={{ transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)' }}
-        className={`flex-1 p-8 transition-[margin-left] duration-500 ${collapsed ? 'ml-20' : 'ml-64'}`}
+        className={`flex-1 flex flex-col transition-[margin-left] duration-500 ${collapsed ? 'ml-20' : 'ml-64'}`}
       >
-        {children}
+        <NotificationHeader />
+        <div className="flex-1 p-8">
+          {children}
+        </div>
       </main>
     </div>
   );
