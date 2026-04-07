@@ -6,11 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '@/components/PageHeader';
-import { Plus, Trash2, Check, Undo2, Pencil } from 'lucide-react';
+import { Plus, Trash2, Check, Undo2, Pencil, Repeat2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { buildTransactionCategoryOptions } from '@/lib/transactionCategories';
+import type { RecurringTransactionFrequency } from '@/types/finance';
 const formatDueDate = (value: string) => {
   const date = new Date(`${value}T00:00:00`);
   if (Number.isNaN(date.getTime())) return 'No due date';
@@ -31,6 +33,8 @@ export default function BillsPage() {
   const [category, setCategory] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [recurring, setRecurring] = useState(true);
+  const [frequency, setFrequency] = useState<RecurringTransactionFrequency>('monthly');
+  const [intervalDays, setIntervalDays] = useState('');
 
   // Edit state
   const [editId, setEditId] = useState<string | null>(null);
@@ -39,19 +43,37 @@ export default function BillsPage() {
   const [editCategory, setEditCategory] = useState('');
   const [editDueDate, setEditDueDate] = useState('');
   const [editRecurring, setEditRecurring] = useState(true);
-  const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
+  const [editFrequency, setEditFrequency] = useState<RecurringTransactionFrequency>('monthly');
+  const [editIntervalDays, setEditIntervalDays] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<{ type: 'bill' | 'recurring'; id: string; label: string } | null>(null);
   const billCategories = useMemo(() => buildTransactionCategoryOptions(transactions), [transactions]);
 
   const handleAdd = () => {
     if (!name || !dueDate) return;
-    addBill({ name, amount: parseFloat(amount) || 0, category: category || 'Other', dueDate, recurring, status: 'pending' });
-    setName(''); setAmount('0'); setCategory(''); setDueDate(''); setShowAdd(false);
+    addBill({
+      name,
+      amount: parseFloat(amount) || 0,
+      category: category || 'Other',
+      dueDate,
+      recurring,
+      frequency: recurring ? frequency : undefined,
+      intervalDays: recurring && frequency === 'custom' ? parseInt(intervalDays, 10) || undefined : undefined,
+      status: 'pending',
+    });
+    setName('');
+    setAmount('0');
+    setCategory('');
+    setDueDate('');
+    setRecurring(true);
+    setFrequency('monthly');
+    setIntervalDays('');
+    setShowAdd(false);
   };
 
   const handleDelete = (billId: string) => {
     const bill = bills.find((item) => item.id === billId);
     if (!bill) return;
-    setPendingDelete({ id: billId, label: bill.name });
+    setPendingDelete({ type: 'bill', id: billId, label: bill.name });
   };
 
   const confirmDeleteBill = () => {
@@ -69,6 +91,8 @@ export default function BillsPage() {
     setEditCategory(b.category);
     setEditDueDate(b.dueDate);
     setEditRecurring(b.recurring);
+    setEditFrequency((b as any).frequency ?? 'monthly');
+    setEditIntervalDays((b as any).intervalDays ? String((b as any).intervalDays) : '');
   };
 
   const handleEdit = () => {
@@ -79,6 +103,8 @@ export default function BillsPage() {
       category: editCategory || 'Other',
       dueDate: editDueDate,
       recurring: editRecurring,
+      frequency: editRecurring ? editFrequency : undefined,
+      intervalDays: editRecurring && editFrequency === 'custom' ? parseInt(editIntervalDays, 10) || undefined : undefined,
     });
     setEditId(null);
   };
@@ -167,9 +193,33 @@ export default function BillsPage() {
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
               </div>
               <div className="flex items-center justify-between pt-2">
-                <Label className="text-foreground">Recurring monthly</Label>
+                <Label className="text-foreground">Recurring</Label>
                 <Switch checked={recurring} onCheckedChange={setRecurring} />
               </div>
+              {recurring && (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                  <div className="space-y-1.5">
+                    <Label>Frequency</Label>
+                    <Select value={frequency} onValueChange={(v) => setFrequency(v as RecurringTransactionFrequency)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                        <SelectItem value="yearly">Yearly</SelectItem>
+                        <SelectItem value="custom">Custom</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {frequency === 'custom' && (
+                    <div className="space-y-1.5">
+                      <Label>Interval (days)</Label>
+                      <Input placeholder="30" type="number" value={intervalDays} onChange={(e) => setIntervalDays(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+              )}
               <Button className="w-full mt-2" onClick={handleAdd}>Add Bill</Button>
             </div>
           </DialogContent>
@@ -204,9 +254,33 @@ export default function BillsPage() {
               <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
             </div>
             <div className="flex items-center justify-between pt-2">
-              <Label className="text-foreground">Recurring monthly</Label>
+              <Label className="text-foreground">Recurring</Label>
               <Switch checked={editRecurring} onCheckedChange={setEditRecurring} />
             </div>
+            {editRecurring && (
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+                <div className="space-y-1.5">
+                  <Label>Frequency</Label>
+                  <Select value={editFrequency} onValueChange={(v) => setEditFrequency(v as RecurringTransactionFrequency)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="daily">Daily</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                      <SelectItem value="biweekly">Bi-weekly</SelectItem>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="yearly">Yearly</SelectItem>
+                      <SelectItem value="custom">Custom</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {editFrequency === 'custom' && (
+                  <div className="space-y-1.5">
+                    <Label>Interval (days)</Label>
+                    <Input placeholder="30" type="number" value={editIntervalDays} onChange={(e) => setEditIntervalDays(e.target.value)} />
+                  </div>
+                )}
+              </div>
+            )}
             <Button className="w-full mt-2" onClick={handleEdit}>Save Changes</Button>
           </div>
         </DialogContent>
@@ -215,13 +289,80 @@ export default function BillsPage() {
       <ConfirmDialog
         open={Boolean(pendingDelete)}
         onOpenChange={(open) => !open && setPendingDelete(null)}
-        title="Delete bill?"
+        title={pendingDelete?.type === 'recurring' ? "Delete recurring bill?" : "Delete bill?"}
         description={
-          pendingDelete ? `Are you sure you want to delete bill "${pendingDelete.label}"? This action cannot be undone.` : ''
+          pendingDelete ? `Are you sure you want to delete "${pendingDelete.label}"? This action cannot be undone.` : ''
         }
         confirmLabel="Delete"
         onConfirm={confirmDeleteBill}
       />
+
+      {/* Recurring Bills Automation */}
+      <div className="glass-card rounded-xl p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-heading font-semibold text-foreground">Recurring bills automation</h3>
+            <p className="text-sm text-muted-foreground mt-1">Bills that auto-roll over on due dates.</p>
+          </div>
+          <Badge variant="secondary">{bills.filter((b) => b.recurring).length} recurring</Badge>
+        </div>
+
+        {bills.filter((b) => b.recurring).length === 0 ? (
+          <p className="text-sm text-muted-foreground">No recurring bills yet. Add one to automate payments.</p>
+        ) : (
+          <div className="space-y-3">
+            {bills
+              .filter((b) => b.recurring)
+              .slice()
+              .sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+              .map((bill) => (
+                <div key={bill.id} className="rounded-xl border border-border/70 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium text-foreground">{bill.name}</p>
+                        <Badge variant={(bill as any).active !== false ? 'default' : 'secondary'}>{(bill as any).active !== false ? 'Active' : 'Paused'}</Badge>
+                        <Badge variant="outline">{bill.category}</Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {currency}{bill.amount.toFixed(2)} · Due: {formatDueDate(bill.dueDate)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {(bill as any).frequency ?? 'monthly'}
+                        {(bill as any).frequency === 'custom' && (bill as any).intervalDays ? ` every ${(bill as any).intervalDays} days` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 rounded-full border border-border/70 px-3 py-1">
+                        <span className="text-xs text-muted-foreground">Enabled</span>
+                        <Switch
+                          checked={(bill as any).active !== false}
+                          onCheckedChange={(checked) => updateBill(bill.id, { active: checked })}
+                        />
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        onClick={() => openEdit(bill.id)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-muted-foreground"
+                        onClick={() => setPendingDelete({ type: 'recurring', id: bill.id, label: bill.name })}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+      </div>
 
       {monthGroups.length > 0 && (
         <div className="space-y-6">
