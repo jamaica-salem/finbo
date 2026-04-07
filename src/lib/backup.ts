@@ -1,4 +1,4 @@
-import type { Account, FinanceBackupSnapshot, FinanceDataState, Transaction } from '@/types/finance';
+import type { Account, CategoryRule, FinanceBackupSnapshot, FinanceDataState, Transaction } from '@/types/finance';
 
 const csvEscape = (value: string) => {
   if (/[",\n\r]/.test(value)) {
@@ -22,6 +22,10 @@ export const buildFinanceBackupSnapshot = (data: FinanceDataState): FinanceBacku
     loanPayments: [...toArray(data.loanPayments)],
     creditCards: [...toArray(data.creditCards)],
     creditCardActivities: [...toArray(data.creditCardActivities)],
+    categoryRules: [...toArray((data as FinanceDataState & { categoryRules?: unknown }).categoryRules)],
+    transactionCategories: [...toArray((data as FinanceDataState & { transactionCategories?: unknown }).transactionCategories)],
+    savingsCategories: [...toArray((data as FinanceDataState & { savingsCategories?: unknown }).savingsCategories)],
+    sharedCategories: [...toArray((data as FinanceDataState & { sharedCategories?: unknown }).sharedCategories)],
     budgets: [...toArray(data.budgets)],
     categoryColors: { ...toRecord(data.categoryColors) },
     bills: [...toArray(data.bills)],
@@ -61,6 +65,10 @@ export const normalizeFinanceBackupSnapshot = (value: unknown): FinanceBackupSna
       loanPayments: data.loanPayments as FinanceDataState['loanPayments'],
       creditCards: data.creditCards as FinanceDataState['creditCards'],
       creditCardActivities: data.creditCardActivities as FinanceDataState['creditCardActivities'],
+      categoryRules: (data as FinanceDataState & { categoryRules?: CategoryRule[] }).categoryRules ?? [],
+      transactionCategories: (data as FinanceDataState & { transactionCategories?: string[] }).transactionCategories ?? [],
+      savingsCategories: (data as FinanceDataState & { savingsCategories?: string[] }).savingsCategories ?? [],
+      sharedCategories: (data as FinanceDataState & { sharedCategories?: string[] }).sharedCategories ?? [],
       budgets: Array.isArray(data.budgets) ? (data.budgets as FinanceDataState['budgets']) : [],
       categoryColors: (data.categoryColors as FinanceDataState['categoryColors']) ?? {},
       bills: data.bills as FinanceDataState['bills'],
@@ -107,11 +115,37 @@ const serializeCsvTable = (title: string, headers: string[], rows: string[][]) =
 };
 
 export const exportFinanceCsv = (data: FinanceDataState) => {
+  const accounts = Array.isArray(data.accounts) ? data.accounts : [];
+  const transactions = Array.isArray(data.transactions) ? data.transactions : [];
+  const recurringTransactionRules = Array.isArray(data.recurringTransactionRules) ? data.recurringTransactionRules : [];
+  const categoryRules = Array.isArray((data as FinanceDataState & { categoryRules?: any[] }).categoryRules)
+    ? (data as FinanceDataState & { categoryRules?: any[] }).categoryRules
+    : [];
+  const transactionCategories = Array.isArray((data as FinanceDataState & { transactionCategories?: string[] }).transactionCategories)
+    ? (data as FinanceDataState & { transactionCategories?: string[] }).transactionCategories
+    : [];
+  const savingsCategories = Array.isArray((data as FinanceDataState & { savingsCategories?: string[] }).savingsCategories)
+    ? (data as FinanceDataState & { savingsCategories?: string[] }).savingsCategories
+    : [];
+  const sharedCategories = Array.isArray((data as FinanceDataState & { sharedCategories?: string[] }).sharedCategories)
+    ? (data as FinanceDataState & { sharedCategories?: string[] }).sharedCategories
+    : [];
+  const budgets = Array.isArray(data.budgets) ? data.budgets : [];
+  const loans = Array.isArray(data.loans) ? data.loans : [];
+  const loanPayments = Array.isArray(data.loanPayments) ? data.loanPayments : [];
+  const creditCards = Array.isArray(data.creditCards) ? data.creditCards : [];
+  const creditCardActivities = Array.isArray(data.creditCardActivities) ? data.creditCardActivities : [];
+  const bills = Array.isArray(data.bills) ? data.bills : [];
+  const savingsGoals = Array.isArray(data.savingsGoals) ? data.savingsGoals : [];
+  const savingsGoalContributions = Array.isArray(data.savingsGoalContributions) ? data.savingsGoalContributions : [];
+  const categoryColors = data.categoryColors ?? {};
+  const currency = data.currency ?? '₱';
+
   const sections = [
     serializeCsvTable(
       'Accounts',
       ['id', 'name', 'type', 'balance', 'currency', 'color'],
-      data.accounts.map((account) => [
+      accounts.map((account) => [
         account.id,
         account.name,
         account.type,
@@ -123,7 +157,7 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Transactions',
       ['id', 'accountId', 'type', 'amount', 'category', 'categories', 'description', 'date', 'tags', 'recurringRuleId', 'scheduledDate'],
-      data.transactions.map((transaction) => [
+      transactions.map((transaction) => [
         transaction.id,
         transaction.accountId,
         transaction.type,
@@ -140,7 +174,7 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Recurring Rules',
       ['id', 'label', 'accountId', 'type', 'amount', 'category', 'description', 'frequency', 'intervalDays', 'startDate', 'nextRunDate', 'endDate', 'active', 'createdAt', 'lastGeneratedDate'],
-      data.recurringTransactionRules.map((rule) => [
+      recurringTransactionRules.map((rule) => [
         rule.id,
         rule.label,
         rule.accountId,
@@ -159,9 +193,25 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
       ]),
     ),
     serializeCsvTable(
+      'Category Rules',
+      ['id', 'pattern', 'category', 'matchType', 'active', 'createdAt', 'updatedAt'],
+      categoryRules.map((rule: any) => [
+        rule.id,
+        rule.pattern,
+        rule.category,
+        rule.matchType,
+        String(rule.active),
+        rule.createdAt,
+        rule.updatedAt,
+      ]),
+    ),
+    serializeCsvTable('Transaction Categories', ['name'], transactionCategories.map((value) => [value])),
+    serializeCsvTable('Savings Categories', ['name'], savingsCategories.map((value) => [value])),
+    serializeCsvTable('Shared Categories', ['name'], sharedCategories.map((value) => [value])),
+    serializeCsvTable(
       'Budgets',
       ['id', 'category', 'limitAmount', 'alertThresholdPct', 'active', 'createdAt', 'updatedAt', 'lastWarningMonthKey', 'lastExceededMonthKey'],
-      data.budgets.map((budget) => [
+      budgets.map((budget) => [
         budget.id,
         budget.category,
         String(budget.limitAmount),
@@ -176,7 +226,7 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Loans',
       ['id', 'name', 'totalAmount', 'paidAmount', 'monthlyPayment', 'monthlyInterestRate', 'startDate', 'dueDay', 'endDate', 'repaymentSchedule', 'type'],
-      data.loans.map((loan) => [
+      loans.map((loan) => [
         loan.id,
         loan.name,
         String(loan.totalAmount),
@@ -193,7 +243,7 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Loan Payments',
       ['id', 'loanId', 'amount', 'date', 'note'],
-      data.loanPayments.map((payment) => [
+      loanPayments.map((payment) => [
         payment.id,
         payment.loanId,
         String(payment.amount),
@@ -204,7 +254,7 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Credit Cards',
       ['id', 'name', 'issuer', 'network', 'creditLimit', 'paidAmount', 'currentBalance', 'statementBalance', 'minimumPayment', 'monthlyInterestRate', 'rewardsRate', 'annualFee', 'dueDate', 'statementCloseDate', 'openedDate', 'autopay', 'rewardsPoints', 'lastPaymentDate'],
-      data.creditCards.map((card) => [
+      creditCards.map((card) => [
         card.id,
         card.name,
         card.issuer,
@@ -228,7 +278,7 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Credit Card Activity',
       ['id', 'cardId', 'type', 'amount', 'date', 'note'],
-      data.creditCardActivities.map((activity) => [
+      creditCardActivities.map((activity) => [
         activity.id,
         activity.cardId,
         activity.type,
@@ -239,8 +289,8 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     ),
     serializeCsvTable(
       'Bills',
-      ['id', 'name', 'amount', 'category', 'dueDate', 'recurring', 'status', 'paidDate'],
-      data.bills.map((bill) => [
+      ['id', 'name', 'amount', 'category', 'dueDate', 'recurring', 'status', 'paidDate', 'lastPaidDate'],
+      bills.map((bill) => [
         bill.id,
         bill.name,
         String(bill.amount),
@@ -249,12 +299,16 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
         String(bill.recurring),
         bill.status,
         bill.paidDate ?? '',
+        // lastPaidDate may be used for recurring bills
+        // keep backward compatibility when missing
+        //
+        (bill as any).lastPaidDate ?? '',
       ]),
     ),
     serializeCsvTable(
       'Savings Goals',
       ['id', 'name', 'category', 'targetAmount', 'savedAmount', 'targetDate', 'createdAt', 'completedAt', 'note'],
-      data.savingsGoals.map((goal) => [
+      savingsGoals.map((goal) => [
         goal.id,
         goal.name,
         goal.category,
@@ -269,7 +323,7 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Savings Contributions',
       ['id', 'goalId', 'amount', 'date', 'note'],
-      data.savingsGoalContributions.map((contribution) => [
+      savingsGoalContributions.map((contribution) => [
         contribution.id,
         contribution.goalId,
         String(contribution.amount),
@@ -280,12 +334,12 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
     serializeCsvTable(
       'Category Colors',
       ['category', 'color'],
-      Object.entries(data.categoryColors).map(([category, color]) => [category, color]),
+      Object.entries(categoryColors).map(([category, color]) => [category, color]),
     ),
     serializeCsvTable(
       'Currency',
       ['symbol'],
-      [[data.currency]],
+      [[currency]],
     ),
   ];
 
