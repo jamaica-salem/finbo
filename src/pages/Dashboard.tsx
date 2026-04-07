@@ -17,7 +17,7 @@ const getCategories = (transaction: { category: string; categories?: string[] })
   (transaction.categories && transaction.categories.length > 0 ? transaction.categories : [transaction.category]).filter(Boolean);
 
 export default function Dashboard() {
-  const { accounts, transactions, loans, bills, currency, categoryColors } = useFinanceStore();
+  const { accounts, transactions, loans, bills, creditCards, recurringTransactionRules, currency, categoryColors } = useFinanceStore();
 
   const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
 
@@ -43,11 +43,23 @@ export default function Dashboard() {
         : `vs last month`;
 
   const activeLoans = loans.filter((l) => l.paidAmount < getLoanTotalWithInterest(l));
-  const totalLoanRemaining = activeLoans.reduce((s, l) => s + Math.max(0, getLoanTotalWithInterest(l) - l.paidAmount), 0);
-  const installments = activeLoans.filter((l) => l.type === 'installment');
-
   const totalBillsDue = bills.filter((b) => b.status !== 'paid').reduce((s, b) => s + b.amount, 0);
   const paidBills = bills.filter((b) => b.status === 'paid').length;
+  const totalLoanRemaining = loans.filter((l) => l.type === 'loan').reduce((s, l) => s + Math.max(0, getLoanTotalWithInterest(l) - l.paidAmount), 0);
+  const totalInstallmentRemaining = loans.filter((l) => l.type === 'installment').reduce((s, l) => s + Math.max(0, getLoanTotalWithInterest(l) - l.paidAmount), 0);
+  const totalLoanMonthlyPayments = loans.filter((l) => l.type === 'loan').reduce((s, l) => s + Math.max(0, l.monthlyPayment), 0);
+  const totalInstallmentMonthlyPayments = loans.filter((l) => l.type === 'installment').reduce((s, l) => s + Math.max(0, l.monthlyPayment), 0);
+  const totalCreditCardDebt = creditCards.reduce((s, card) => s + Math.max(0, card.currentBalance), 0);
+  const totalCreditCardMinimumPayments = creditCards.reduce((s, card) => s + Math.max(0, card.minimumPayment), 0);
+  const activeMonthlyRecurringExpenses = recurringTransactionRules
+    .filter((rule) => rule.active && rule.type === 'expense' && rule.frequency === 'monthly')
+    .reduce((s, rule) => s + Math.max(0, rule.amount), 0);
+
+  const totalMonthlyPayments = totalBillsDue + totalLoanMonthlyPayments + totalInstallmentMonthlyPayments + totalCreditCardMinimumPayments + activeMonthlyRecurringExpenses;
+  const totalDebts = totalLoanRemaining + totalInstallmentRemaining + totalCreditCardDebt;
+  const netAfterDebts = totalBalance - totalDebts;
+  const totalLoansCount = loans.filter((l) => l.type === 'loan').length;
+  const totalInstallmentsCount = loans.filter((l) => l.type === 'installment').length;
 
   const getDueTime = (value: string) => {
     const time = new Date(`${value}T00:00:00`).getTime();
@@ -104,16 +116,43 @@ export default function Dashboard() {
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
-          title="Active Loans"
-          value={String(activeLoans.length)}
-          subtitle={`${currency}${totalLoanRemaining.toLocaleString()} remaining`}
+          title="Total Loans"
+          value={`${currency}${totalLoanRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle={`${totalLoansCount} loan${totalLoansCount === 1 ? '' : 's'}`}
           icon={<CreditCard className="h-5 w-5" />}
         />
         <StatCard
-          title="Installments"
-          value={String(installments.length)}
-          subtitle={`${currency}${installments.reduce((s, i) => s + Math.max(0, getLoanTotalWithInterest(i) - i.paidAmount), 0).toLocaleString()} remaining`}
+          title="Total Installments"
+          value={`${currency}${totalInstallmentRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle={`${totalInstallmentsCount} installment${totalInstallmentsCount === 1 ? '' : 's'}`}
           icon={<CalendarClock className="h-5 w-5" />}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          title="Monthly Payments"
+          value={`${currency}${totalMonthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Bills + loans + installments + credit cards + recurring expenses"
+          icon={<Receipt className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Total Debts"
+          value={`${currency}${totalDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Loans + installments + credit cards"
+          icon={<CreditCard className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Net"
+          value={`${currency}${netAfterDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Total balance - total debts"
+          icon={<TrendingUp className="h-5 w-5" />}
+        />
+        <StatCard
+          title="Credit Cards"
+          value={`${currency}${totalCreditCardDebt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle={`${creditCards.length} card${creditCards.length === 1 ? '' : 's'}`}
+          icon={<CreditCard className="h-5 w-5" />}
         />
       </div>
 
