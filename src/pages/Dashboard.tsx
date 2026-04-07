@@ -25,7 +25,7 @@ const getCategories = (transaction: { category: string; categories?: string[] })
   (transaction.categories && transaction.categories.length > 0 ? transaction.categories : [transaction.category]).filter(Boolean);
 
 export default function Dashboard() {
-  const { accounts, transactions, loans, bills, creditCards, recurringTransactionRules, currency, categoryColors, transactionCategories, sharedCategories, addTransaction, addBill, logLoanPayment, logCreditCardPayment, markBillPaid } = useFinanceStore();
+  const { accounts, transactions, loans, bills, creditCards, recurringTransactionRules, currency, categoryColors, transactionCategories, sharedCategories, nickname, addTransaction, addBill, logLoanPayment, logCreditCardPayment, markBillPaid } = useFinanceStore();
 
   // Quick actions state
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -239,8 +239,8 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Dashboard"
-        description="Your financial overview at a glance"
+        title={nickname ? `Welcome, ${nickname}` : 'Welcome'}
+        description={nickname ? `Here is your money snapshot today. You are doing great keeping it on track.` : 'Here is your money snapshot today. You are doing great keeping it on track.'}
         actions={
           <div className="flex items-center gap-2">
             <Dialog open={showAddExpense} onOpenChange={setShowAddExpense}>
