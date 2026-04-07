@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Sparkles, Wallet, BarChart3, Gift, CheckCircle2, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '@/components/PageHeader';
+import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,8 +30,14 @@ const steps = [
 ];
 
 export default function OnboardingPage() {
-  const { currency, replaceFinanceData } = useFinanceStore();
+  const { currency, replaceFinanceData, accounts, transactions, budgets } = useFinanceStore();
   const [showSampleConfirm, setShowSampleConfirm] = useState(false);
+
+  const hasAccount = accounts.length > 0;
+  const hasTransaction = transactions.length > 0;
+  const hasBudget = budgets.length > 0;
+  const completedCount = Number(hasAccount) + Number(hasTransaction) + Number(hasBudget);
+  const progressPct = Math.round((completedCount / 3) * 100);
 
   const handleLoadSampleData = () => {
     replaceFinanceData(generateSampleFinanceData(currency));
@@ -64,18 +71,83 @@ export default function OnboardingPage() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        {steps.map(({ title, description, icon: Icon }) => (
-          <Card key={title}>
-            <CardContent className="p-5">
-              <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                <Icon className="h-4 w-4 text-primary" />
-                {title}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Getting started</CardTitle>
+            <CardDescription>Complete these to get the most out of Finbo.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-sm font-medium">Setup progress</div>
+              <div className="text-sm font-medium">{progressPct}%</div>
+            </div>
+            <Progress value={progressPct} />
+
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Wallet className="h-4 w-4 text-primary" />
+                  <div className="text-sm">Add an account</div>
+                </div>
+                <div>
+                  {hasAccount ? (
+                    <Badge>Done</Badge>
+                  ) : (
+                    <Link to="/accounts">
+                      <Button size="sm">Add account</Button>
+                    </Link>
+                  )}
+                </div>
               </div>
-              <p className="mt-2 text-sm text-muted-foreground">{description}</p>
-            </CardContent>
-          </Card>
-        ))}
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  <div className="text-sm">Log a transaction</div>
+                </div>
+                <div>
+                  {hasTransaction ? (
+                    <Badge>Done</Badge>
+                  ) : (
+                    <Link to="/accounts">
+                      <Button size="sm">Add transaction</Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  <div className="text-sm">Create a budget</div>
+                </div>
+                <div>
+                  {hasBudget ? (
+                    <Badge>Done</Badge>
+                  ) : (
+                    <Link to="/budget">
+                      <Button size="sm">Create budget</Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <div className="grid gap-4 sm:grid-cols-2 lg:col-span-2">
+          {steps.map(({ title, description, icon: Icon }, index) => (
+            <Card key={title} className={index === 2 ? 'sm:col-span-2' : ''}>
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                  <Icon className="h-4 w-4 text-primary" />
+                  {title}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{description}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -99,10 +171,10 @@ export default function OnboardingPage() {
         </Card>
 
         <Card>
-        <CardHeader>
-          <CardTitle>What to do next</CardTitle>
-          <CardDescription>Here’s the fastest path if you want to start from scratch.</CardDescription>
-        </CardHeader>
+          <CardHeader>
+            <CardTitle>What to do next</CardTitle>
+            <CardDescription>Here’s the fastest path if you want to start from scratch.</CardDescription>
+          </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>1. Add one account.</p>
             <p>2. Log a few transactions.</p>
