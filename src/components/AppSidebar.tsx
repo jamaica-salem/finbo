@@ -12,8 +12,8 @@ const navItems = [
   { to: '/credits', label: 'Credits', icon: CreditCard },
   { to: '/savings', label: 'Savings', icon: PiggyBank },
   { to: '/budget', label: 'Budget', icon: Target },
-  { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/bills', label: 'Bills', icon: Receipt },
+  { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
