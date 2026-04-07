@@ -22,6 +22,8 @@ export default function AccountsPage() {
     transactions,
     recurringTransactionRules,
     categoryColors,
+    transactionCategories,
+    sharedCategories,
     addAccount,
     updateAccount,
     deleteAccount,
@@ -382,7 +384,7 @@ export default function AccountsPage() {
     setTxDateFrom(toIso(thirtyDaysAgo));
     setTxDateTo(toIso(now));
   };
-  const transactionCategories = useMemo(() => buildTransactionCategoryOptions(transactions), [transactions]);
+  const transactionCategoryOptions = useMemo(() => buildTransactionCategoryOptions(transactions, transactionCategories, sharedCategories), [transactions, transactionCategories, sharedCategories]);
   const confirmPendingDelete = () => {
     if (!pendingDelete) return;
 
@@ -443,7 +445,7 @@ export default function AccountsPage() {
                     <Select value={ruleCategory} onValueChange={setRuleCategory}>
                       <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                       <SelectContent>
-                        {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -581,7 +583,7 @@ export default function AccountsPage() {
                       <Select value={txCategory} onValueChange={setTxCategory}>
                         <SelectTrigger><SelectValue placeholder="Select a category or add a new one" /></SelectTrigger>
                         <SelectContent>
-                          {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
@@ -686,7 +688,7 @@ export default function AccountsPage() {
                   <Select value={editTxCategory} onValueChange={setEditTxCategory}>
                     <SelectTrigger><SelectValue placeholder="Select a category or add a new one" /></SelectTrigger>
                     <SelectContent>
-                      {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                      {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -749,7 +751,7 @@ export default function AccountsPage() {
               <Select value={editRuleCategory} onValueChange={setEditRuleCategory}>
                 <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
                 <SelectContent>
-                  {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {transactionCategoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
