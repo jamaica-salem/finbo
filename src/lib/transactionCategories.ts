@@ -13,8 +13,16 @@ export const DEFAULT_TRANSACTION_CATEGORIES = [
   'Other',
 ];
 
-export const buildTransactionCategoryOptions = (transactions: Transaction[]) => {
+export const buildTransactionCategoryOptions = (
+  transactions: Transaction[],
+  extraCategories: string[] = [],
+  sharedCategories: string[] = [],
+) => {
   const categories = new Set<string>(DEFAULT_TRANSACTION_CATEGORIES);
+  [...extraCategories, ...sharedCategories].forEach((category) => {
+    const normalized = category.trim();
+    if (normalized) categories.add(normalized);
+  });
 
   transactions.forEach((transaction) => {
     (transaction.categories?.length ? transaction.categories : [transaction.category]).forEach((category) => {
