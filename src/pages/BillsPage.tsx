@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,13 +46,28 @@ export default function BillsPage() {
   const [editRecurring, setEditRecurring] = useState(true);
   const [editFrequency, setEditFrequency] = useState<RecurringTransactionFrequency>('monthly');
   const [editIntervalDays, setEditIntervalDays] = useState('');
+  const [addErrors, setAddErrors] = useState<{ name?: string; amount?: string; dueDate?: string; intervalDays?: string }>({});
+  const [editErrors, setEditErrors] = useState<{ name?: string; amount?: string; dueDate?: string; intervalDays?: string }>({});
   const [pendingDelete, setPendingDelete] = useState<{ type: 'bill' | 'recurring'; id: string; label: string } | null>(null);
   const billCategories = useMemo(() => buildTransactionCategoryOptions(transactions, transactionCategories, sharedCategories), [transactions, transactionCategories, sharedCategories]);
 
   const handleAdd = () => {
-    if (!name || !dueDate) return;
+    setAddErrors({});
+    const errors: typeof addErrors = {};
+    if (!name.trim()) errors.name = 'Bill name is required';
+    if (!(parseFloat(amount) > 0)) errors.amount = 'Amount must be greater than 0';
+    if (!dueDate) errors.dueDate = 'Due date is required';
+    if (recurring && frequency === 'custom' && !(parseInt(intervalDays, 10) > 0)) {
+      errors.intervalDays = 'Interval must be greater than 0';
+    }
+    if (Object.keys(errors).length > 0) {
+      setAddErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
     addBill({
-      name,
+      name: name.trim(),
       amount: parseFloat(amount) || 0,
       category: category || 'Other',
       dueDate,
@@ -67,6 +83,7 @@ export default function BillsPage() {
     setRecurring(true);
     setFrequency('monthly');
     setIntervalDays('');
+    setAddErrors({});
     setShowAdd(false);
   };
 
@@ -93,12 +110,27 @@ export default function BillsPage() {
     setEditRecurring(b.recurring);
     setEditFrequency((b as any).frequency ?? 'monthly');
     setEditIntervalDays((b as any).intervalDays ? String((b as any).intervalDays) : '');
+    setEditErrors({});
   };
 
   const handleEdit = () => {
-    if (!editId || !editName || !editDueDate) return;
+    setEditErrors({});
+    const errors: typeof editErrors = {};
+    if (!editId) return;
+    if (!editName.trim()) errors.name = 'Bill name is required';
+    if (!(parseFloat(editAmount) > 0)) errors.amount = 'Amount must be greater than 0';
+    if (!editDueDate) errors.dueDate = 'Due date is required';
+    if (editRecurring && editFrequency === 'custom' && !(parseInt(editIntervalDays, 10) > 0)) {
+      errors.intervalDays = 'Interval must be greater than 0';
+    }
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
     updateBill(editId, {
-      name: editName,
+      name: editName.trim(),
       amount: parseFloat(editAmount) || 0,
       category: editCategory || 'Other',
       dueDate: editDueDate,
@@ -106,6 +138,7 @@ export default function BillsPage() {
       frequency: editRecurring ? editFrequency : undefined,
       intervalDays: editRecurring && editFrequency === 'custom' ? parseInt(editIntervalDays, 10) || undefined : undefined,
     });
+    setEditErrors({});
     setEditId(null);
   };
 
@@ -164,7 +197,13 @@ export default function BillsPage() {
         title="Bills & Due Dates"
         description="Manage recurring and one-time bills"
         actions={
-        <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <Dialog
+          open={showAdd}
+          onOpenChange={(open) => {
+            setShowAdd(open);
+            if (!open) setAddErrors({});
+          }}
+        >
           <DialogTrigger asChild>
             <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Bill</Button>
           </DialogTrigger>
@@ -174,10 +213,12 @@ export default function BillsPage() {
               <div className="space-y-1.5">
                 <Label>Bill name</Label>
                 <Input placeholder="e.g. Netflix" value={name} onChange={(e) => setName(e.target.value)} />
+                {addErrors.name ? <p className="text-sm text-destructive">{addErrors.name}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Amount</Label>
                 <Input placeholder="0.00" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                {addErrors.amount ? <p className="text-sm text-destructive">{addErrors.amount}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Category</Label>
@@ -191,6 +232,7 @@ export default function BillsPage() {
               <div className="space-y-1.5">
                 <Label>Due date</Label>
                 <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+                {addErrors.dueDate ? <p className="text-sm text-destructive">{addErrors.dueDate}</p> : null}
               </div>
               <div className="flex items-center justify-between pt-2">
                 <Label className="text-foreground">Recurring</Label>
@@ -216,6 +258,7 @@ export default function BillsPage() {
                     <div className="space-y-1.5">
                       <Label>Interval (days)</Label>
                       <Input placeholder="30" type="number" value={intervalDays} onChange={(e) => setIntervalDays(e.target.value)} />
+                      {addErrors.intervalDays ? <p className="text-sm text-destructive">{addErrors.intervalDays}</p> : null}
                     </div>
                   )}
                 </div>
@@ -228,17 +271,25 @@ export default function BillsPage() {
       />
 
       {/* Edit Bill Dialog */}
-      <Dialog open={!!editId} onOpenChange={() => setEditId(null)}>
+      <Dialog
+        open={!!editId}
+        onOpenChange={() => {
+          setEditId(null);
+          setEditErrors({});
+        }}
+      >
         <DialogContent>
           <DialogHeader><DialogTitle>Edit Bill</DialogTitle></DialogHeader>
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Bill name</Label>
               <Input placeholder="e.g. Netflix" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              {editErrors.name ? <p className="text-sm text-destructive">{editErrors.name}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Amount</Label>
               <Input placeholder="0.00" type="number" value={editAmount} onChange={(e) => setEditAmount(e.target.value)} />
+              {editErrors.amount ? <p className="text-sm text-destructive">{editErrors.amount}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Category</Label>
@@ -252,6 +303,7 @@ export default function BillsPage() {
             <div className="space-y-1.5">
               <Label>Due date</Label>
               <Input type="date" value={editDueDate} onChange={(e) => setEditDueDate(e.target.value)} />
+              {editErrors.dueDate ? <p className="text-sm text-destructive">{editErrors.dueDate}</p> : null}
             </div>
             <div className="flex items-center justify-between pt-2">
               <Label className="text-foreground">Recurring</Label>
@@ -277,6 +329,7 @@ export default function BillsPage() {
                   <div className="space-y-1.5">
                     <Label>Interval (days)</Label>
                     <Input placeholder="30" type="number" value={editIntervalDays} onChange={(e) => setEditIntervalDays(e.target.value)} />
+                    {editErrors.intervalDays ? <p className="text-sm text-destructive">{editErrors.intervalDays}</p> : null}
                   </div>
                 )}
               </div>
