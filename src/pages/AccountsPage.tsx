@@ -8,12 +8,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { PageHeader } from '@/components/PageHeader';
-import { Plus, Trash2, ArrowUpRight, ArrowDownRight, Wallet, Building2, Smartphone, Pencil, Repeat2 } from 'lucide-react';
+import { Plus, Trash2, ArrowUpRight, ArrowDownRight, ArrowLeftRight, Wallet, Building2, Smartphone, Pencil, Repeat2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { buildTransactionCategoryOptions, getCategoryColor } from '@/lib/transactionCategories';
 import type { AccountType, RecurringTransactionFrequency } from '@/types/finance';
 const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, cash: Wallet, 'e-wallet': Smartphone };
+const TRANSACTIONS_PER_PAGE = 20;
 
 export default function AccountsPage() {
   const {
@@ -38,6 +39,12 @@ export default function AccountsPage() {
   const [showRecurring, setShowRecurring] = useState(false);
   const [editRecurringId, setEditRecurringId] = useState<string | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [txSearch, setTxSearch] = useState('');
+  const [txDateFrom, setTxDateFrom] = useState('');
+  const [txDateTo, setTxDateTo] = useState('');
+  const [txAmountMin, setTxAmountMin] = useState('');
+  const [txAmountMax, setTxAmountMax] = useState('');
+  const [txPage, setTxPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState<
     | { type: 'account'; id: string; label: string }
     | { type: 'transaction'; id: string; label: string }
@@ -58,7 +65,8 @@ export default function AccountsPage() {
 
   // Add transaction form
   const [txAccount, setTxAccount] = useState('');
-  const [txType, setTxType] = useState<'income' | 'expense'>('expense');
+  const [txType, setTxType] = useState<'income' | 'expense' | 'transfer'>('expense');
+  const [txTransferAccount, setTxTransferAccount] = useState('');
   const [txAmount, setTxAmount] = useState('0');
   const [txCategory, setTxCategory] = useState('');
   const [txExtraCategory, setTxExtraCategory] = useState('');
@@ -68,7 +76,8 @@ export default function AccountsPage() {
 
   // Edit transaction form
   const [editTxAccount, setEditTxAccount] = useState('');
-  const [editTxType, setEditTxType] = useState<'income' | 'expense'>('expense');
+  const [editTxType, setEditTxType] = useState<'income' | 'expense' | 'transfer'>('expense');
+  const [editTxTransferAccount, setEditTxTransferAccount] = useState('');
   const [editTxAmount, setEditTxAmount] = useState('0');
   const [editTxCategory, setEditTxCategory] = useState('');
   const [editTxExtraCategory, setEditTxExtraCategory] = useState('');
@@ -141,19 +150,22 @@ export default function AccountsPage() {
   };
 
   const handleAddTx = () => {
-    const primaryCategory = txCategory.trim() || txExtraCategory.trim();
+    const isTransfer = txType === 'transfer';
+    const primaryCategory = isTransfer ? 'Transfer' : txCategory.trim() || txExtraCategory.trim();
     const extraCategory = txCategory.trim() && txExtraCategory.trim() && txExtraCategory.trim() !== txCategory.trim()
       ? txExtraCategory.trim()
       : '';
 
     if (!txAccount || !txAmount || !primaryCategory) return;
+    if (isTransfer && (!txTransferAccount || txTransferAccount === txAccount)) return;
 
     addTransaction({
       accountId: txAccount,
       type: txType,
+      transferAccountId: isTransfer ? txTransferAccount : undefined,
       amount: parseFloat(txAmount),
       category: primaryCategory,
-      categories: [primaryCategory, extraCategory].filter(Boolean),
+      categories: isTransfer ? ['Transfer'] : [primaryCategory, extraCategory].filter(Boolean),
       tags: txTags.split(/[,\n;]/).map((item) => item.trim()).filter(Boolean),
       description: txDesc,
       date: txDate,
@@ -162,6 +174,7 @@ export default function AccountsPage() {
     setTxExtraCategory('');
     setTxTags('');
     setTxDesc('');
+    setTxTransferAccount('');
     setShowAddTx(false);
   };
 
@@ -175,6 +188,7 @@ export default function AccountsPage() {
     setEditTxId(txId);
     setEditTxAccount(tx.accountId);
     setEditTxType(tx.type);
+    setEditTxTransferAccount(tx.transferAccountId ?? '');
     setEditTxAmount(String(tx.amount));
     setEditTxCategory(primaryCategory);
     setEditTxExtraCategory(extraCategory);
@@ -185,20 +199,23 @@ export default function AccountsPage() {
 
   const handleEditTx = () => {
     if (!editTxId || !editTxAccount || !editTxAmount) return;
+    const isTransfer = editTxType === 'transfer';
 
-    const primaryCategory = editTxCategory.trim() || editTxExtraCategory.trim();
+    const primaryCategory = isTransfer ? 'Transfer' : editTxCategory.trim() || editTxExtraCategory.trim();
     const extraCategory = editTxCategory.trim() && editTxExtraCategory.trim() && editTxExtraCategory.trim() !== editTxCategory.trim()
       ? editTxExtraCategory.trim()
       : '';
 
     if (!primaryCategory) return;
+    if (isTransfer && (!editTxTransferAccount || editTxTransferAccount === editTxAccount)) return;
 
     updateTransaction(editTxId, {
       accountId: editTxAccount,
       type: editTxType,
+      transferAccountId: isTransfer ? editTxTransferAccount : undefined,
       amount: parseFloat(editTxAmount) || 0,
       category: primaryCategory,
-      categories: [primaryCategory, extraCategory].filter(Boolean),
+      categories: isTransfer ? ['Transfer'] : [primaryCategory, extraCategory].filter(Boolean),
       tags: editTxTags.split(/[,\n;]/).map((item) => item.trim()).filter(Boolean),
       description: editTxDesc,
       date: editTxDate,
@@ -279,9 +296,92 @@ export default function AccountsPage() {
     setEditRecurringId(null);
   };
 
-  const filteredTx = selectedAccount
-    ? transactions.filter((t) => t.accountId === selectedAccount)
-    : transactions;
+  const accountScopedTransactions = useMemo(
+    () => (selectedAccount ? transactions.filter((transaction) => transaction.accountId === selectedAccount) : transactions),
+    [selectedAccount, transactions],
+  );
+
+  const filteredTx = useMemo(() => {
+    const searchTerm = txSearch.trim().toLowerCase();
+    const minAmount = Number(txAmountMin);
+    const maxAmount = Number(txAmountMax);
+    const hasMinAmount = txAmountMin.trim() !== '' && Number.isFinite(minAmount);
+    const hasMaxAmount = txAmountMax.trim() !== '' && Number.isFinite(maxAmount);
+    const normalizedDateFrom = txDateFrom && txDateTo && txDateFrom > txDateTo ? txDateTo : txDateFrom;
+    const normalizedDateTo = txDateFrom && txDateTo && txDateFrom > txDateTo ? txDateFrom : txDateTo;
+    const normalizedMinAmount = hasMinAmount && hasMaxAmount && minAmount > maxAmount ? maxAmount : minAmount;
+    const normalizedMaxAmount = hasMinAmount && hasMaxAmount && minAmount > maxAmount ? minAmount : maxAmount;
+
+    return accountScopedTransactions.filter((transaction) => {
+      if (searchTerm) {
+        const searchable = [
+          transaction.description,
+          transaction.category,
+          ...(transaction.categories ?? []),
+          ...(transaction.tags ?? []),
+        ]
+          .join(' ')
+          .toLowerCase();
+        if (!searchable.includes(searchTerm)) return false;
+      }
+
+      if (normalizedDateFrom && transaction.date < normalizedDateFrom) return false;
+      if (normalizedDateTo && transaction.date > normalizedDateTo) return false;
+
+      if (hasMinAmount && transaction.amount < normalizedMinAmount) return false;
+      if (hasMaxAmount && transaction.amount > normalizedMaxAmount) return false;
+
+      return true;
+    });
+  }, [accountScopedTransactions, txAmountMax, txAmountMin, txDateFrom, txDateTo, txSearch]);
+  const sortedFilteredTx = useMemo(
+    () => [...filteredTx].sort((a, b) => b.date.localeCompare(a.date)),
+    [filteredTx],
+  );
+  const totalTransactionPages = Math.max(1, Math.ceil(sortedFilteredTx.length / TRANSACTIONS_PER_PAGE));
+  const currentTxPage = Math.min(txPage, totalTransactionPages);
+  const paginatedTransactions = useMemo(() => {
+    const start = (currentTxPage - 1) * TRANSACTIONS_PER_PAGE;
+    return sortedFilteredTx.slice(start, start + TRANSACTIONS_PER_PAGE);
+  }, [currentTxPage, sortedFilteredTx]);
+  const pageStartIndex = sortedFilteredTx.length === 0 ? 0 : (currentTxPage - 1) * TRANSACTIONS_PER_PAGE + 1;
+  const pageEndIndex = Math.min(currentTxPage * TRANSACTIONS_PER_PAGE, sortedFilteredTx.length);
+  const hasTransactionFilters =
+    txSearch.trim() !== '' || txDateFrom !== '' || txDateTo !== '' || txAmountMin.trim() !== '' || txAmountMax.trim() !== '';
+
+  useEffect(() => {
+    setTxPage(1);
+  }, [selectedAccount, txSearch, txDateFrom, txDateTo, txAmountMin, txAmountMax]);
+
+  useEffect(() => {
+    if (txPage > totalTransactionPages) {
+      setTxPage(totalTransactionPages);
+    }
+  }, [totalTransactionPages, txPage]);
+
+  const clearTransactionFilters = () => {
+    setTxSearch('');
+    setTxDateFrom('');
+    setTxDateTo('');
+    setTxAmountMin('');
+    setTxAmountMax('');
+  };
+  const applyQuickDateRange = (preset: 'thisMonth' | 'last30d') => {
+    const now = new Date();
+    const toIso = (value: Date) => value.toISOString().split('T')[0];
+
+    if (preset === 'thisMonth') {
+      const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+      setTxDateFrom(toIso(firstDay));
+      setTxDateTo(toIso(now));
+      return;
+    }
+
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(now.getDate() - 30);
+    setTxDateFrom(toIso(thirtyDaysAgo));
+    setTxDateTo(toIso(now));
+  };
   const transactionCategories = useMemo(() => buildTransactionCategoryOptions(transactions), [transactions]);
   const confirmPendingDelete = () => {
     if (!pendingDelete) return;
@@ -450,31 +550,47 @@ export default function AccountsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Transaction type</Label>
-                  <Select value={txType} onValueChange={(v) => setTxType(v as 'income' | 'expense')}>
+                  <Select value={txType} onValueChange={(v) => setTxType(v as 'income' | 'expense' | 'transfer')}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="income">Income</SelectItem>
                       <SelectItem value="expense">Expense</SelectItem>
+                      <SelectItem value="transfer">Transfer</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {txType === 'transfer' && (
+                  <div className="space-y-1.5">
+                    <Label>Destination account</Label>
+                    <Select value={txTransferAccount} onValueChange={setTxTransferAccount}>
+                      <SelectTrigger><SelectValue placeholder="Select destination" /></SelectTrigger>
+                      <SelectContent>
+                        {accounts.filter((a) => a.id !== txAccount).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label>Amount</Label>
                   <Input placeholder="0.00" type="number" value={txAmount} onChange={(e) => setTxAmount(e.target.value)} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Category</Label>
-                  <Select value={txCategory} onValueChange={setTxCategory}>
-                    <SelectTrigger><SelectValue placeholder="Select a category or add a new one" /></SelectTrigger>
-                    <SelectContent>
-                      {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>Add category</Label>
-                  <Input placeholder="e.g. Groceries - Delivery" value={txExtraCategory} onChange={(e) => setTxExtraCategory(e.target.value)} />
-                </div>
+                {txType !== 'transfer' && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label>Category</Label>
+                      <Select value={txCategory} onValueChange={setTxCategory}>
+                        <SelectTrigger><SelectValue placeholder="Select a category or add a new one" /></SelectTrigger>
+                        <SelectContent>
+                          {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Add category</Label>
+                      <Input placeholder="e.g. Groceries - Delivery" value={txExtraCategory} onChange={(e) => setTxExtraCategory(e.target.value)} />
+                    </div>
+                  </>
+                )}
                 <div className="space-y-1.5">
                   <Label>Tags</Label>
                   <Input placeholder="e.g. monthly, family, reimbursable" value={txTags} onChange={(e) => setTxTags(e.target.value)} />
@@ -539,31 +655,47 @@ export default function AccountsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Transaction type</Label>
-              <Select value={editTxType} onValueChange={(v) => setEditTxType(v as 'income' | 'expense')}>
+              <Select value={editTxType} onValueChange={(v) => setEditTxType(v as 'income' | 'expense' | 'transfer')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="income">Income</SelectItem>
                   <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="transfer">Transfer</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            {editTxType === 'transfer' && (
+              <div className="space-y-1.5">
+                <Label>Destination account</Label>
+                <Select value={editTxTransferAccount} onValueChange={setEditTxTransferAccount}>
+                  <SelectTrigger><SelectValue placeholder="Select destination" /></SelectTrigger>
+                  <SelectContent>
+                    {accounts.filter((a) => a.id !== editTxAccount).map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Amount</Label>
               <Input placeholder="0.00" type="number" value={editTxAmount} onChange={(e) => setEditTxAmount(e.target.value)} />
             </div>
-            <div className="space-y-1.5">
-              <Label>Category</Label>
-              <Select value={editTxCategory} onValueChange={setEditTxCategory}>
-                <SelectTrigger><SelectValue placeholder="Select a category or add a new one" /></SelectTrigger>
-                <SelectContent>
-                  {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Add category</Label>
-              <Input placeholder="e.g. Groceries - Delivery" value={editTxExtraCategory} onChange={(e) => setEditTxExtraCategory(e.target.value)} />
-            </div>
+            {editTxType !== 'transfer' && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Category</Label>
+                  <Select value={editTxCategory} onValueChange={setEditTxCategory}>
+                    <SelectTrigger><SelectValue placeholder="Select a category or add a new one" /></SelectTrigger>
+                    <SelectContent>
+                      {transactionCategories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Add category</Label>
+                  <Input placeholder="e.g. Groceries - Delivery" value={editTxExtraCategory} onChange={(e) => setEditTxExtraCategory(e.target.value)} />
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
               <Label>Tags</Label>
               <Input placeholder="e.g. monthly, family, reimbursable" value={editTxTags} onChange={(e) => setEditTxTags(e.target.value)} />
@@ -785,21 +917,107 @@ export default function AccountsPage() {
         <h3 className="font-heading font-semibold text-foreground mb-4">
           {selectedAccount ? `Transactions — ${accounts.find(a => a.id === selectedAccount)?.name}` : 'All Transactions'}
         </h3>
+        <div className="mb-4 rounded-xl border border-border/70 bg-background/40 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+            <div className="flex-1 space-y-1.5">
+              <Label htmlFor="tx-search">Search transactions</Label>
+              <Input
+                id="tx-search"
+                placeholder="Search description, tags, or categories"
+                value={txSearch}
+                onChange={(e) => setTxSearch(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => applyQuickDateRange('thisMonth')}>
+                This month
+              </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => applyQuickDateRange('last30d')}>
+                Last 30 days
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={clearTransactionFilters} disabled={!hasTransactionFilters}>
+                Clear all
+              </Button>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="tx-date-from">Date from</Label>
+              <Input id="tx-date-from" type="date" value={txDateFrom} onChange={(e) => setTxDateFrom(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tx-date-to">Date to</Label>
+              <Input id="tx-date-to" type="date" value={txDateTo} onChange={(e) => setTxDateTo(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tx-amount-min">Amount min</Label>
+              <Input
+                id="tx-amount-min"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={txAmountMin}
+                onChange={(e) => setTxAmountMin(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="tx-amount-max">Amount max</Label>
+              <Input
+                id="tx-amount-max"
+                type="number"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
+                value={txAmountMax}
+                onChange={(e) => setTxAmountMax(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+            <p>
+              Showing {sortedFilteredTx.length} of {accountScopedTransactions.length} transactions
+            </p>
+            {hasTransactionFilters ? <Badge variant="secondary">Filters active</Badge> : null}
+          </div>
+        </div>
         <div className="space-y-2">
-          {filteredTx.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No transactions yet.</p>
+          {sortedFilteredTx.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              {transactions.length === 0 ? 'No transactions yet.' : 'No transactions match your filters.'}
+            </p>
           ) : (
-            filteredTx.sort((a, b) => b.date.localeCompare(a.date)).map((tx) => (
+            paginatedTransactions.map((tx) => (
               <div key={tx.id} className="flex items-center justify-between py-2.5 border-b border-border last:border-0">
                 <div className="flex items-center gap-3">
+                  {(() => {
+                    const transferDestination = tx.transferAccountId
+                      ? accounts.find((account) => account.id === tx.transferAccountId)
+                      : null;
+                    const iconClassName = tx.type === 'income'
+                      ? 'bg-success/10 text-success'
+                      : tx.type === 'expense'
+                        ? 'bg-destructive/10 text-destructive'
+                        : 'bg-primary/10 text-primary';
+
+                    return (
+                      <>
                   <div className={cn(
                     'h-8 w-8 rounded-full flex items-center justify-center',
-                    tx.type === 'income' ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'
+                    iconClassName
                   )}>
-                    {tx.type === 'income' ? <ArrowDownRight className="h-4 w-4" /> : <ArrowUpRight className="h-4 w-4" />}
+                    {tx.type === 'income'
+                      ? <ArrowDownRight className="h-4 w-4" />
+                      : tx.type === 'expense'
+                        ? <ArrowUpRight className="h-4 w-4" />
+                        : <ArrowLeftRight className="h-4 w-4" />}
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-foreground">{tx.description || tx.category}</p>
+                    <p className="text-sm font-medium text-foreground">
+                      {tx.type === 'transfer' && transferDestination
+                        ? `${tx.description || 'Transfer'} to ${transferDestination.name}`
+                        : tx.description || tx.category}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {(tx.categories?.length ? tx.categories : [tx.category]).map((category, index) => (
                         <span key={`${tx.id}-${category}`} className="inline-flex items-center">
@@ -812,6 +1030,9 @@ export default function AccountsPage() {
                         </span>
                       ))} · {tx.date}
                     </p>
+                    {tx.type === 'transfer' && transferDestination ? (
+                      <p className="text-[11px] text-muted-foreground">From {accounts.find((account) => account.id === tx.accountId)?.name ?? 'Unknown'} to {transferDestination.name}</p>
+                    ) : null}
                     {tx.tags && tx.tags.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {tx.tags.map((tag) => (
@@ -822,11 +1043,15 @@ export default function AccountsPage() {
                       </div>
                     )}
                   </div>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   {tx.recurringRuleId ? <Badge variant="secondary">Recurring</Badge> : null}
-                  <p className={cn('text-sm font-semibold', tx.type === 'income' ? 'text-success' : 'text-destructive')}>
-                    {tx.type === 'income' ? '+' : '-'}{currency}{tx.amount.toFixed(2)}
+                  {tx.type === 'transfer' ? <Badge variant="outline">Transfer</Badge> : null}
+                  <p className={cn('text-sm font-semibold', tx.type === 'income' ? 'text-success' : tx.type === 'expense' ? 'text-destructive' : 'text-primary')}>
+                    {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}{currency}{tx.amount.toFixed(2)}
                   </p>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEditTransaction(tx.id)}>
                     <Pencil className="h-3 w-3" />
@@ -839,6 +1064,34 @@ export default function AccountsPage() {
             ))
           )}
         </div>
+        {sortedFilteredTx.length > 0 ? (
+          <div className="mt-4 flex flex-col gap-3 border-t border-border/70 pt-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-xs text-muted-foreground">
+              Showing {pageStartIndex}-{pageEndIndex} of {sortedFilteredTx.length}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setTxPage((page) => Math.max(1, page - 1))}
+                disabled={currentTxPage === 1}
+              >
+                Previous
+              </Button>
+              <Badge variant="outline">Page {currentTxPage} of {totalTransactionPages}</Badge>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setTxPage((page) => Math.min(totalTransactionPages, page + 1))}
+                disabled={currentTxPage === totalTransactionPages}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <ConfirmDialog
