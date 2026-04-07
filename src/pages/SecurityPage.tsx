@@ -549,7 +549,9 @@ export default function SecurityPage() {
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleResetDevice}>Reset now</AlertDialogAction>
+                <AlertDialogAction onClick={handleResetDevice} variant="destructive">
+                  Reset now
+                </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
