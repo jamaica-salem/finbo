@@ -44,6 +44,8 @@ const statusRank: Record<BudgetStatus, number> = {
 export default function BudgetPage() {
   const {
     transactions,
+    transactionCategories,
+    sharedCategories,
     budgets,
     addBudget,
     updateBudget,
@@ -63,7 +65,7 @@ export default function BudgetPage() {
   const currentMonthKey = format(now, 'yyyy-MM');
   const currentMonthLabel = format(now, 'MMMM yyyy');
   const categorySuggestions = useMemo(() => {
-    const base = buildTransactionCategoryOptions(transactions);
+    const base = buildTransactionCategoryOptions(transactions, transactionCategories, sharedCategories);
     const extras = ['Housing', 'Subscriptions', 'Education', 'Travel'];
     return Array.from(new Set([...base, ...extras]));
   }, [transactions]);
