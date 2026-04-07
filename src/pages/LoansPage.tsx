@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { Plus, Trash2, CreditCard, Pencil, PhilippinePeso, TrendingDown, CalendarClock, Percent } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { deriveLoanMonthlyInterestRate, getLoanNextDueAmount, getLoanNextDueDate, getLoanTotalWithInterest } from '@/lib/interest';
+import { toast } from 'sonner';
 
 type LoanScheduleFormRow = {
   id: string;
@@ -135,6 +136,9 @@ export default function LoansPage() {
   const [editScheduleEndDate, setEditScheduleEndDate] = useState('');
   const [editScheduleMonthlyPayment, setEditScheduleMonthlyPayment] = useState('');
   const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
+  const [addErrors, setAddErrors] = useState<{ name?: string; total?: string; schedule?: string }>({});
+  const [editErrors, setEditErrors] = useState<{ name?: string; total?: string; schedule?: string }>({});
+  const [payError, setPayError] = useState<string | null>(null);
 
   const addGeneratedRows = buildEqualMonthlyRows(
     scheduleStartDate,
@@ -152,9 +156,17 @@ export default function LoansPage() {
   const editSourceRows = editSameMonthlyPayment ? editGeneratedRows : editScheduleRows;
 
   const handleAdd = () => {
-    if (!name) return;
+    setAddErrors({});
+    const errors: typeof addErrors = {};
+    if (!name) errors.name = 'Name is required';
+    if (!(parseFloat(total) > 0)) errors.total = 'Total amount must be greater than 0';
     const scheduleMetadata = getScheduleMetadata(addSourceRows);
-    if (scheduleMetadata.repaymentSchedule.length === 0) return;
+    if (scheduleMetadata.repaymentSchedule.length === 0) errors.schedule = 'Repayment schedule must have at least one row';
+    if (Object.keys(errors).length > 0) {
+      setAddErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
     const monthlyInterestRate = deriveLoanMonthlyInterestRate({
       totalAmount: parseFloat(total) || 0,
       monthlyPayment: scheduleMetadata.monthlyPayment,
@@ -184,6 +196,7 @@ export default function LoansPage() {
     setScheduleEndDate('');
     setScheduleMonthlyPayment('');
     setShowAdd(false);
+    toast('Loan created');
   };
 
   const openEdit = (id: string) => {
@@ -211,9 +224,18 @@ export default function LoansPage() {
   };
 
   const handleEdit = () => {
-    if (!editId || !editName) return;
+    setEditErrors({});
+    const errors: typeof editErrors = {};
+    if (!editId) return;
+    if (!editName) errors.name = 'Name is required';
+    if (!(parseFloat(editTotal) > 0)) errors.total = 'Total amount must be greater than 0';
     const scheduleMetadata = getScheduleMetadata(editSourceRows);
-    if (scheduleMetadata.repaymentSchedule.length === 0) return;
+    if (scheduleMetadata.repaymentSchedule.length === 0) errors.schedule = 'Repayment schedule must have at least one row';
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
     const monthlyInterestRate = deriveLoanMonthlyInterestRate({
       totalAmount: parseFloat(editTotal) || 0,
       monthlyPayment: scheduleMetadata.monthlyPayment,
@@ -235,17 +257,30 @@ export default function LoansPage() {
       type: editType,
     });
     setEditId(null);
+    toast('Loan updated');
   };
 
   const handlePay = () => {
-    if (!payLoanId || !payAmount) return;
+    setPayError(null);
+    if (!payLoanId) return;
     const loan = loans.find((item) => item.id === payLoanId);
     if (!loan) return;
     const remaining = Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount);
-    const paymentAmount = Math.min(parseFloat(payAmount) || 0, remaining);
-    if (paymentAmount <= 0) return;
+    const requested = parseFloat(payAmount) || 0;
+    if (!(requested > 0)) {
+      setPayError('Enter an amount greater than 0');
+      toast.error('Invalid payment amount');
+      return;
+    }
+    const paymentAmount = Math.min(requested, remaining);
+    if (paymentAmount <= 0) {
+      setPayError('Payment must be greater than remaining balance');
+      toast.error('Payment must be greater than remaining balance');
+      return;
+    }
     logLoanPayment(payLoanId, paymentAmount, payNote || undefined);
     setPayAmount(''); setPayNote(''); setPayLoanId(null);
+    toast('Payment logged');
   };
 
   const handleDeleteLoan = (loanId: string) => {
@@ -455,6 +490,7 @@ export default function LoansPage() {
               <div className="space-y-1.5">
                 <Label>Name</Label>
                 <Input placeholder="e.g. Car Loan" value={name} onChange={(e) => setName(e.target.value)} />
+                {addErrors.name ? <p className="text-sm text-destructive">{addErrors.name}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Type</Label>
@@ -469,6 +505,7 @@ export default function LoansPage() {
             <div className="space-y-1.5">
               <Label>Total amount (without interest)</Label>
               <Input placeholder="0.00" type="number" value={total} onChange={(e) => setTotal(e.target.value)} />
+              {addErrors.total ? <p className="text-sm text-destructive">{addErrors.total}</p> : null}
             </div>
               <div className="space-y-1.5">
                 <Label>Paid amount</Label>
@@ -488,9 +525,9 @@ export default function LoansPage() {
                   <Label>Monthly payment plan</Label>
                   <div className="grid gap-3 md:grid-cols-2">
                     <div className="space-y-1.5">
-                      <Label>Start date</Label>
-                      <Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} />
-                    </div>
+                          <Label>Start date</Label>
+                          <Input type="date" value={scheduleStartDate} onChange={(e) => setScheduleStartDate(e.target.value)} />
+                        </div>
                     <div className="space-y-1.5">
                       <Label>End date</Label>
                       <Input type="date" value={scheduleEndDate} onChange={(e) => setScheduleEndDate(e.target.value)} />
@@ -504,6 +541,7 @@ export default function LoansPage() {
                       value={scheduleMonthlyPayment}
                       onChange={(e) => setScheduleMonthlyPayment(e.target.value)}
                     />
+                    {addErrors.schedule ? <p className="text-sm text-destructive">{addErrors.schedule}</p> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Generated {addGeneratedRows.length} payment{addGeneratedRows.length === 1 ? '' : 's'} at {currency}
@@ -561,6 +599,7 @@ export default function LoansPage() {
             <div className="space-y-1.5">
               <Label>Payment amount</Label>
               <Input placeholder="0.00" type="number" value={payAmount} onChange={(e) => setPayAmount(e.target.value)} />
+              {payError ? <p className="text-sm text-destructive">{payError}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Note (optional)</Label>
@@ -579,6 +618,7 @@ export default function LoansPage() {
             <div className="space-y-1.5">
               <Label>Name</Label>
               <Input placeholder="e.g. Car Loan" value={editName} onChange={(e) => setEditName(e.target.value)} />
+              {editErrors.name ? <p className="text-sm text-destructive">{editErrors.name}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Type</Label>
@@ -593,6 +633,7 @@ export default function LoansPage() {
             <div className="space-y-1.5">
               <Label>Total amount (without interest)</Label>
               <Input placeholder="0.00" type="number" value={editTotal} onChange={(e) => setEditTotal(e.target.value)} />
+              {editErrors.total ? <p className="text-sm text-destructive">{editErrors.total}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Paid amount</Label>
@@ -632,6 +673,7 @@ export default function LoansPage() {
                     value={editScheduleMonthlyPayment}
                     onChange={(e) => setEditScheduleMonthlyPayment(e.target.value)}
                   />
+                  {editErrors.schedule ? <p className="text-sm text-destructive">{editErrors.schedule}</p> : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Generated {editGeneratedRows.length} payment{editGeneratedRows.length === 1 ? '' : 's'} at {currency}
