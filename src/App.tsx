@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -20,9 +20,34 @@ import SecurityPage from "./pages/SecurityPage";
 import OnboardingPage from "./pages/OnboardingPage";
 import SupportPage from "./pages/SupportPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
+import WelcomePage from "./pages/WelcomePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
+
+function HomeRoute() {
+  const nickname = useFinanceStore((state) => state.nickname);
+  if (!nickname?.trim()) {
+    return <Navigate to="/welcome" replace />;
+  }
+  return <Dashboard />;
+}
+
+function WelcomeRoute() {
+  const nickname = useFinanceStore((state) => state.nickname);
+  if (nickname?.trim()) {
+    return <Navigate to="/" replace />;
+  }
+  return <WelcomePage />;
+}
+
+function RequireNickname({ children }: { children: React.ReactNode }) {
+  const nickname = useFinanceStore((state) => state.nickname);
+  if (!nickname?.trim()) {
+    return <Navigate to="/welcome" replace />;
+  }
+  return <>{children}</>;
+}
 
 function RecurringTransactionScheduler() {
   const runRecurringTransactionScheduler = useFinanceStore((state) => state.runRecurringTransactionScheduler);
@@ -81,23 +106,33 @@ const App = () => (
         <SecurityGate>
           <RecurringTransactionScheduler />
           <BudgetAlertMonitor />
-          <AppLayout>
-            <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/accounts" element={<AccountsPage />} />
-              <Route path="/loans" element={<LoansPage />} />
-              <Route path="/credits" element={<CreditsPage />} />
-              <Route path="/bills" element={<BillsPage />} />
-              <Route path="/budget" element={<BudgetPage />} />
-              <Route path="/categories" element={<CategoriesPage />} />
-              <Route path="/savings" element={<SavingsGoalsPage />} />
-              <Route path="/security" element={<SecurityPage />} />
-              <Route path="/onboarding" element={<OnboardingPage />} />
-              <Route path="/support" element={<SupportPage />} />
-              <Route path="/analytics" element={<AnalyticsPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AppLayout>
+          <Routes>
+            <Route path="/welcome" element={<WelcomeRoute />} />
+            <Route
+              path="*"
+              element={(
+                <RequireNickname>
+                  <AppLayout>
+                    <Routes>
+                      <Route path="/" element={<HomeRoute />} />
+                      <Route path="/accounts" element={<AccountsPage />} />
+                      <Route path="/loans" element={<LoansPage />} />
+                      <Route path="/credits" element={<CreditsPage />} />
+                      <Route path="/bills" element={<BillsPage />} />
+                      <Route path="/budget" element={<BudgetPage />} />
+                      <Route path="/categories" element={<CategoriesPage />} />
+                      <Route path="/savings" element={<SavingsGoalsPage />} />
+                      <Route path="/security" element={<SecurityPage />} />
+                      <Route path="/onboarding" element={<OnboardingPage />} />
+                      <Route path="/support" element={<SupportPage />} />
+                      <Route path="/analytics" element={<AnalyticsPage />} />
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </AppLayout>
+                </RequireNickname>
+              )}
+            />
+          </Routes>
         </SecurityGate>
       </BrowserRouter>
     </TooltipProvider>
