@@ -8,6 +8,7 @@ import type {
   MonthlyBudget,
   BudgetAlert,
   Loan,
+  LoanScheduleEntry,
   LoanPayment,
   Bill,
   BillInstance,
@@ -18,6 +19,7 @@ import type {
   FinanceDataState,
 } from '@/types/finance';
 import { addDays, addMonths, addWeeks, addYears, format, parseISO, isAfter } from 'date-fns';
+import { applyLoanPaymentToSchedule, deriveLoanMonthlyInterestRate, getLoanRepaymentSchedule, getLoanTotalWithInterest } from '@/lib/interest';
 
 // Generate a simple ID
 const uid = () => Math.random().toString(36).slice(2, 10);
@@ -118,6 +120,93 @@ const normalizeBill = (bill: Partial<Bill> & { dueDay?: unknown }): Bill => {
     paidDate: isIsoDate(bill.paidDate) ? bill.paidDate : undefined,
   };
 };
+
+const normalizeLoan = (loan: Partial<Loan> & { dueDate?: unknown; interestRate?: unknown }): Loan => {
+  const scheduleSource = Array.isArray(loan.repaymentSchedule) ? loan.repaymentSchedule : [];
+  const normalizedSchedule = getLoanRepaymentSchedule({
+    totalAmount: typeof loan.totalAmount === 'number' ? loan.totalAmount : Number(loan.totalAmount) || 0,
+    monthlyPayment: typeof loan.monthlyPayment === 'number' ? loan.monthlyPayment : Number(loan.monthlyPayment) || 0,
+    startDate: isIsoDate(loan.startDate) ? loan.startDate : '',
+    endDate: isIsoDate(loan.endDate)
+      ? loan.endDate
+      : isIsoDate(loan.dueDate)
+        ? loan.dueDate
+        : '',
+    dueDay: typeof loan.dueDay === 'number' ? loan.dueDay : Number(loan.dueDay) || 1,
+    repaymentSchedule: scheduleSource as Partial<LoanScheduleEntry>[],
+  });
+  const schedulePaidAmount = normalizedSchedule.reduce((sum, entry) => sum + entry.paidAmount, 0);
+  const requestedPaidAmount = typeof loan.paidAmount === 'number' ? loan.paidAmount : Number(loan.paidAmount) || 0;
+  const allocatedSchedule =
+    requestedPaidAmount > schedulePaidAmount
+      ? applyLoanPaymentToSchedule(normalizedSchedule, requestedPaidAmount - schedulePaidAmount).schedule
+      : normalizedSchedule;
+  const paidAmount =
+    allocatedSchedule.length > 0
+      ? allocatedSchedule.reduce((sum, entry) => sum + entry.paidAmount, 0)
+      : requestedPaidAmount;
+  const firstScheduleEntry = allocatedSchedule[0];
+  const lastScheduleEntry = allocatedSchedule[allocatedSchedule.length - 1];
+  const dueDayFromSchedule = firstScheduleEntry ? new Date(`${firstScheduleEntry.dueDate}T00:00:00`).getDate() : 1;
+  const startDate = firstScheduleEntry?.dueDate ?? (isIsoDate(loan.startDate) ? loan.startDate : '');
+  const endDate = lastScheduleEntry?.dueDate ?? (isIsoDate(loan.endDate) ? loan.endDate : isIsoDate(loan.dueDate) ? loan.dueDate : '');
+  const averageMonthlyPayment =
+    allocatedSchedule.length > 0
+      ? allocatedSchedule.reduce((sum, entry) => sum + entry.amount, 0) / allocatedSchedule.length
+      : typeof loan.monthlyPayment === 'number'
+        ? loan.monthlyPayment
+        : Number(loan.monthlyPayment) || 0;
+
+  const normalizedLoan = {
+    id: loan.id ?? uid(),
+    name: loan.name ?? 'Untitled Loan',
+    totalAmount: typeof loan.totalAmount === 'number' ? loan.totalAmount : Number(loan.totalAmount) || 0,
+    paidAmount,
+    monthlyPayment: averageMonthlyPayment,
+    monthlyInterestRate:
+      typeof loan.monthlyInterestRate === 'number'
+        ? loan.monthlyInterestRate
+        : typeof loan.interestRate === 'number'
+          ? loan.interestRate
+          : Number(loan.interestRate) || 0,
+    startDate,
+    dueDay: Number.isFinite(dueDayFromSchedule) ? Math.min(31, Math.max(1, dueDayFromSchedule)) : 1,
+    endDate,
+    repaymentSchedule: allocatedSchedule,
+    type: loan.type === 'installment' ? 'installment' : 'loan',
+  } satisfies Loan;
+
+  return {
+    ...normalizedLoan,
+    monthlyInterestRate: deriveLoanMonthlyInterestRate(normalizedLoan),
+  };
+};
+
+const normalizeCreditCard = (card: Partial<CreditCard>): CreditCard => ({
+  id: card.id ?? uid(),
+  name: card.name ?? 'Untitled Card',
+  issuer: card.issuer ?? 'Unknown',
+  network: card.network ?? 'other',
+  creditLimit: typeof card.creditLimit === 'number' ? card.creditLimit : Number(card.creditLimit) || 0,
+  paidAmount: typeof card.paidAmount === 'number' ? card.paidAmount : Number(card.paidAmount) || 0,
+  currentBalance: typeof card.currentBalance === 'number' ? card.currentBalance : Number(card.currentBalance) || 0,
+  statementBalance: typeof card.statementBalance === 'number' ? card.statementBalance : Number(card.statementBalance) || 0,
+  minimumPayment: typeof card.minimumPayment === 'number' ? card.minimumPayment : Number(card.minimumPayment) || 0,
+  monthlyInterestRate:
+    typeof card.monthlyInterestRate === 'number'
+      ? card.monthlyInterestRate
+      : typeof card.apr === 'number'
+        ? card.apr
+        : Number(card.apr) || 0,
+  rewardsRate: typeof card.rewardsRate === 'number' ? card.rewardsRate : Number(card.rewardsRate) || 0,
+  annualFee: typeof card.annualFee === 'number' ? card.annualFee : Number(card.annualFee) || 0,
+  dueDate: isIsoDate(card.dueDate) ? card.dueDate : '',
+  statementCloseDate: isIsoDate(card.statementCloseDate) ? card.statementCloseDate : '',
+  openedDate: isIsoDate(card.openedDate) ? card.openedDate : '',
+  autopay: typeof card.autopay === 'boolean' ? card.autopay : false,
+  rewardsPoints: typeof card.rewardsPoints === 'number' ? card.rewardsPoints : Number(card.rewardsPoints) || 0,
+  lastPaymentDate: isIsoDate(card.lastPaymentDate) ? card.lastPaymentDate : undefined,
+});
 
 const initialAccounts: Account[] = [];
 
@@ -513,12 +602,29 @@ export const useFinanceStore = create<FinanceState>()(
         return alerts;
       },
 
-      addLoan: (loan) => set((s) => ({ loans: [...s.loans, { ...loan, id: uid() }] })),
-      updateLoan: (id, data) => set((s) => ({ loans: s.loans.map((l) => l.id === id ? { ...l, ...data } : l) })),
+      addLoan: (loan) => set((s) => {
+        const nextLoan = normalizeLoan({ ...loan, id: uid() });
+        return { loans: [...s.loans, nextLoan] };
+      }),
+      updateLoan: (id, data) => set((s) => ({
+        loans: s.loans.map((loan) => {
+          if (loan.id !== id) return loan;
+          return normalizeLoan({ ...loan, ...data, id });
+        }),
+      })),
       deleteLoan: (id) => set((s) => ({ loans: s.loans.filter((l) => l.id !== id) })),
       logLoanPayment: (loanId, amount, note) => set((s) => {
         const payment: LoanPayment = { id: uid(), loanId, amount, date: new Date().toISOString().split('T')[0], note };
-        const loans = s.loans.map((l) => l.id === loanId ? { ...l, paidAmount: l.paidAmount + amount } : l);
+        const loans = s.loans.map((loan) => {
+          if (loan.id !== loanId) return loan;
+          const scheduleResult = applyLoanPaymentToSchedule(loan.repaymentSchedule, amount);
+          const paidAmount = Math.min(getLoanTotalWithInterest(loan), loan.paidAmount + scheduleResult.appliedAmount);
+          return {
+            ...loan,
+            paidAmount,
+            repaymentSchedule: scheduleResult.schedule,
+          };
+        });
         return { loanPayments: [...s.loanPayments, payment], loans };
       }),
 
@@ -545,6 +651,7 @@ export const useFinanceStore = create<FinanceState>()(
           const applied = Math.min(paymentAmount, card.currentBalance);
           return {
             ...card,
+            paidAmount: card.paidAmount + applied,
             currentBalance: Math.max(0, card.currentBalance - applied),
             statementBalance: Math.max(0, card.statementBalance - applied),
             rewardsPoints: card.rewardsPoints,
@@ -639,9 +746,9 @@ export const useFinanceStore = create<FinanceState>()(
         recurringTransactionRules: (data as FinanceDataState & { recurringTransactionRules?: RecurringTransactionRule[] }).recurringTransactionRules ?? [],
         budgets: (data as FinanceDataState & { budgets?: MonthlyBudget[] }).budgets ?? [],
         categoryColors: (data as FinanceDataState & { categoryColors?: Record<string, string> }).categoryColors ?? {},
-        loans: data.loans,
+        loans: data.loans.map((loan) => normalizeLoan(loan)),
         loanPayments: data.loanPayments,
-        creditCards: data.creditCards,
+        creditCards: data.creditCards.map((card) => normalizeCreditCard(card)),
         creditCardActivities: data.creditCardActivities,
         bills: data.bills,
         savingsGoals: data.savingsGoals,
@@ -661,7 +768,9 @@ export const useFinanceStore = create<FinanceState>()(
           recurringTransactionRules: state.recurringTransactionRules ?? [],
           budgets: state.budgets ?? [],
           categoryColors: state.categoryColors ?? {},
+          loans: state.loans?.map((loan) => normalizeLoan(loan)) ?? [],
           bills: state.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
+          creditCards: state.creditCards?.map((card) => normalizeCreditCard(card)) ?? [],
         };
       },
       merge: (persistedState, currentState) => {
@@ -676,7 +785,9 @@ export const useFinanceStore = create<FinanceState>()(
           recurringTransactionRules: typedState.recurringTransactionRules ?? currentState.recurringTransactionRules,
           budgets: typedState.budgets ?? currentState.budgets,
           categoryColors: typedState.categoryColors ?? currentState.categoryColors,
+          loans: typedState.loans?.map((loan) => normalizeLoan(loan)) ?? currentState.loans,
           bills: typedState.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
+          creditCards: typedState.creditCards?.map((card) => normalizeCreditCard(card)) ?? currentState.creditCards,
         };
       },
     }
