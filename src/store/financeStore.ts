@@ -318,6 +318,7 @@ interface FinanceState {
   savingsGoals: SavingsGoal[];
   savingsGoalContributions: SavingsGoalContribution[];
   currency: string;
+  nickname: string;
   // lightweight undo history for destructive actions
   undoStack: UndoEntry[];
   // Account actions
@@ -368,7 +369,7 @@ interface FinanceState {
   addBill: (bill: Omit<Bill, 'id'>) => void;
   updateBill: (id: string, data: Partial<Bill>) => void;
   deleteBill: (id: string) => void;
-  markBillPaid: (id: string) => void;
+  markBillPaid: (id: string, paidDate?: string) => void;
   markBillUnpaid: (id: string) => void;
 
   // Savings goal actions
@@ -379,6 +380,7 @@ interface FinanceState {
   
   // Settings actions
   setCurrency: (currency: string) => void;
+  setNickname: (nickname: string) => void;
   replaceFinanceData: (data: FinanceDataState) => void;
 }
 
@@ -402,6 +404,7 @@ export const useFinanceStore = create<FinanceState>()(
       savingsGoals: initialSavingsGoals,
       savingsGoalContributions: initialSavingsGoalContributions,
       currency: '₱',
+      nickname: '',
       undoStack: [],
 
       addAccount: (account) => set((s) => ({ accounts: [...s.accounts, { ...account, id: uid() }] })),
@@ -1019,6 +1022,7 @@ export const useFinanceStore = create<FinanceState>()(
       }),
 
       setCurrency: (currency) => set({ currency }),
+      setNickname: (nickname) => set({ nickname: nickname.trim() }),
       // pushUndoEntry defined above
 
       undoLast: () => set((s) => {
