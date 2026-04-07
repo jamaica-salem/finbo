@@ -1,12 +1,29 @@
 import { useFinanceStore } from '@/store/financeStore';
-import { AlertCircle, Bell, Clock } from 'lucide-react';
+import { AlertCircle, Bell, CircleUserRound, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { toast } from 'sonner';
 
 export function NotificationHeader() {
-  const { bills, loans, creditCards, currency } = useFinanceStore();
+  const { bills, loans, creditCards, currency, nickname, setNickname } = useFinanceStore();
   const [open, setOpen] = useState(false);
+  const [showEditNickname, setShowEditNickname] = useState(false);
+  const [nicknameDraft, setNicknameDraft] = useState(nickname || '');
+
+  const handleSaveNickname = () => {
+    const next = nicknameDraft.trim();
+    if (!next) {
+      toast.error('Nickname cannot be empty');
+      return;
+    }
+    setNickname(next);
+    setShowEditNickname(false);
+    toast.success('Nickname updated');
+  };
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -92,17 +109,55 @@ export function NotificationHeader() {
               </div>
             )}
           </div>
-          <DialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5" />
-              {totalNotifications > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-semibold text-destructive-foreground">
-                  {totalNotifications > 99 ? '99+' : totalNotifications}
-                </span>
-              )}
-              <span className="sr-only">Open notifications</span>
-            </Button>
-          </DialogTrigger>
+          <div className="flex items-center gap-1">
+            <DialogTrigger asChild>
+              <Button variant="ghost" size="icon" className="relative">
+                <Bell className="h-5 w-5" />
+                {totalNotifications > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1 text-[11px] font-semibold text-destructive-foreground">
+                    {totalNotifications > 99 ? '99+' : totalNotifications}
+                  </span>
+                )}
+                <span className="sr-only">Open notifications</span>
+              </Button>
+            </DialogTrigger>
+
+            <Dialog open={showEditNickname} onOpenChange={(nextOpen) => {
+              setShowEditNickname(nextOpen);
+              if (nextOpen) setNicknameDraft(nickname || '');
+            }}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" aria-label="Open profile menu">
+                    <CircleUserRound className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onSelect={() => setShowEditNickname(true)}>
+                    Edit nickname
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit nickname</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label>Nickname</Label>
+                    <Input
+                      value={nicknameDraft}
+                      onChange={(e) => setNicknameDraft(e.target.value)}
+                      placeholder="Enter nickname"
+                      maxLength={30}
+                    />
+                  </div>
+                  <Button className="w-full" onClick={handleSaveNickname}>Save nickname</Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
