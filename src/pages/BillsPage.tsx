@@ -25,7 +25,7 @@ const formatMonthLabel = (value: string) => {
 };
 
 export default function BillsPage() {
-  const { bills, addBill, updateBill, deleteBill, markBillPaid, currency, transactions } = useFinanceStore();
+  const { bills, addBill, updateBill, deleteBill, markBillPaid, currency, transactions, transactionCategories, sharedCategories } = useFinanceStore();
   const [showAdd, setShowAdd] = useState(false);
 
   const [name, setName] = useState('');
@@ -46,7 +46,7 @@ export default function BillsPage() {
   const [editFrequency, setEditFrequency] = useState<RecurringTransactionFrequency>('monthly');
   const [editIntervalDays, setEditIntervalDays] = useState('');
   const [pendingDelete, setPendingDelete] = useState<{ type: 'bill' | 'recurring'; id: string; label: string } | null>(null);
-  const billCategories = useMemo(() => buildTransactionCategoryOptions(transactions), [transactions]);
+  const billCategories = useMemo(() => buildTransactionCategoryOptions(transactions, transactionCategories, sharedCategories), [transactions, transactionCategories, sharedCategories]);
 
   const handleAdd = () => {
     if (!name || !dueDate) return;
