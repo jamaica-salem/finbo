@@ -125,6 +125,7 @@ export default function OnboardingPage() {
         title="Load sample data?"
         description="This will replace your current finance data with a sample set for exploring Finbo."
         confirmLabel="Load sample data"
+        destructive={false}
         onConfirm={handleLoadSampleData}
       />
     </div>
