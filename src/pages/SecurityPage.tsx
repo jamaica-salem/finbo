@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import { KeyRound, Clock3, TriangleAlert, RotateCcw, CheckCircle2, Download, Upload, FileText } from 'lucide-react';
+import { KeyRound, Clock3, TriangleAlert, RotateCcw, CheckCircle2, Download, Upload, FileText, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,7 +76,7 @@ const buildCsvMappingFromHeaders = (headers: string[]): CsvMapping => ({
 
 export default function SecurityPage() {
   const finance = useFinanceStore();
-  const { pinHash, pinSalt, autoLockMinutes, setAutoLockMinutes, setPinRecord } = useSecurityStore();
+  const { pinHash, pinSalt, autoLockMinutes, setAutoLockMinutes, setPinRecord, clearPinRecord } = useSecurityStore();
   const {
     accounts,
     transactions,
@@ -84,17 +84,24 @@ export default function SecurityPage() {
     loanPayments,
     creditCards,
     creditCardActivities,
+    categoryRules,
+    transactionCategories,
+    savingsCategories,
+    sharedCategories,
     bills,
     savingsGoals,
     savingsGoalContributions,
     currency,
     addTransaction,
     replaceFinanceData,
+    mergeFinanceData,
   } = finance;
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [isSavingPin, setIsSavingPin] = useState(false);
+  const [deletePin, setDeletePin] = useState('');
+  const [isDeletingPin, setIsDeletingPin] = useState(false);
   const [customTimeout, setCustomTimeout] = useState(String(autoLockMinutes));
   const hasPin = Boolean(pinHash && pinSalt);
   const [pendingBackup, setPendingBackup] = useState<FinanceBackupSnapshot | null>(null);
@@ -154,6 +161,10 @@ export default function SecurityPage() {
     const snapshot = buildFinanceBackupSnapshot({
       accounts,
       transactions,
+      categoryRules,
+      transactionCategories,
+      savingsCategories,
+      sharedCategories,
       loans,
       loanPayments,
       creditCards,
@@ -174,6 +185,11 @@ export default function SecurityPage() {
       exportFinanceCsv({
         accounts,
         transactions,
+        recurringTransactionRules: finance.recurringTransactionRules,
+        categoryRules,
+        transactionCategories,
+        savingsCategories,
+        sharedCategories,
         loans,
         loanPayments,
         creditCards,
@@ -213,11 +229,28 @@ export default function SecurityPage() {
   };
 
   const handleRestoreBackup = () => {
+    // kept for compatibility; prefer using explicit Merge/Replace buttons
     if (!pendingBackup) return;
     replaceFinanceData(pendingBackup.data);
     setPendingBackup(null);
     setPendingBackupName('');
     toast.success('Backup restored.');
+  };
+
+  const handleMergeBackup = () => {
+    if (!pendingBackup) return;
+    mergeFinanceData(pendingBackup.data);
+    setPendingBackup(null);
+    setPendingBackupName('');
+    toast.success('Backup merged into current data.');
+  };
+
+  const handleReplaceBackupConfirmed = () => {
+    if (!pendingBackup) return;
+    replaceFinanceData(pendingBackup.data);
+    setPendingBackup(null);
+    setPendingBackupName('');
+    toast.success('Backup restored (replaced current data).');
   };
 
   const handleCsvFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -379,6 +412,36 @@ export default function SecurityPage() {
     window.location.reload();
   };
 
+  const handleDeletePin = async () => {
+    if (!isValidPin(deletePin)) {
+      toast.error('Enter your current PIN (4-6 digits).');
+      return;
+    }
+
+    if (!pinHash || !pinSalt) {
+      toast.error('No PIN is currently set.');
+      return;
+    }
+
+    setIsDeletingPin(true);
+    try {
+      const valid = await verifyPin(deletePin, pinSalt, pinHash);
+      if (!valid) {
+        toast.error('Current PIN is incorrect.');
+        return;
+      }
+
+      clearPinRecord();
+      setDeletePin('');
+      setCurrentPin('');
+      setNewPin('');
+      setConfirmPin('');
+      toast.success('PIN removed. PIN protection disabled on this device.');
+    } finally {
+      setIsDeletingPin(false);
+    }
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -465,6 +528,45 @@ export default function SecurityPage() {
             <Button onClick={handleChangePin} disabled={isSavingPin} className="w-full">
               {isSavingPin ? 'Saving PIN...' : hasPin ? 'Save new PIN' : 'Set PIN'}
             </Button>
+            {hasPin && (
+              <div className="pt-2">
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                      <Button variant="destructive" className="w-full" type="button">
+                        Disable PIN
+                      </Button>
+                    </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Disable PIN protection?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Enter your current PIN to disable local PIN protection on this device. This will not delete your
+                        financial data.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-2 py-2">
+                      <Label htmlFor="delete-pin">Current PIN</Label>
+                      <Input
+                        id="delete-pin"
+                        value={deletePin}
+                        onChange={(e) => setDeletePin(e.target.value)}
+                        inputMode="numeric"
+                        pattern="\d*"
+                        placeholder="Enter current PIN"
+                        type="password"
+                        maxLength={6}
+                      />
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={handleDeletePin} variant="destructive">
+                        {isDeletingPin ? 'Disabling...' : 'Disable PIN'}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -599,6 +701,44 @@ export default function SecurityPage() {
 
           {jsonError && <p className="text-sm text-destructive">{jsonError}</p>}
           {csvImportError && <p className="text-sm text-destructive">{csvImportError}</p>}
+          {pendingBackup && (
+            <div className="mt-4 rounded-lg border border-border p-4 bg-muted/20">
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="text-sm font-medium">Loaded backup</div>
+                  <div className="text-xs text-muted-foreground">{pendingBackupName || 'Unnamed backup'}</div>
+                  <div className="mt-2 text-sm">
+                    This backup contains your saved finance data. Choose whether to <strong>merge</strong> the backup into
+                    your existing data (adds items that don't exist) or <strong>replace</strong> your current data entirely.
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                  <Button type="button" variant="outline" onClick={handleMergeBackup}>
+                    Merge backup
+                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button type="button" variant="destructive">Replace data</Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Replace current data?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will replace all locally stored finance data with the contents of the backup. This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleReplaceBackupConfirmed} variant="destructive">
+                          Replace data
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -730,12 +870,21 @@ export default function SecurityPage() {
 
       <AlertDialog open={Boolean(pendingBackup)} onOpenChange={(open) => !open && setPendingBackup(null)}>
         <AlertDialogContent>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-4 top-4 h-8 w-8 rounded-full text-muted-foreground"
+            onClick={() => setPendingBackup(null)}
+            aria-label="Close restore dialog"
+          >
+            <X className="h-4 w-4" />
+          </Button>
           <AlertDialogHeader>
             <AlertDialogTitle>Restore this backup?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will replace your current finance data with the contents of{' '}
-              <span className="font-medium text-foreground">{pendingBackupName || 'the selected file'}</span>. This cannot be
-              undone.
+              This backup will be applied to your current finance data: you can <strong>merge</strong> (add items that don't yet
+              exist) or <strong>replace</strong> your current data entirely with the backup contents.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-2 text-sm text-muted-foreground">
@@ -747,8 +896,14 @@ export default function SecurityPage() {
             </p>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingBackup(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRestoreBackup}>Restore backup</AlertDialogAction>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" onClick={handleMergeBackup}>
+                Merge backup
+              </Button>
+              <AlertDialogAction onClick={handleReplaceBackupConfirmed} variant="destructive">
+                Replace data
+              </AlertDialogAction>
+            </div>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
