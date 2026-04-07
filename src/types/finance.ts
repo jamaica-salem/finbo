@@ -67,15 +67,24 @@ export interface BudgetAlert {
   monthKey: string;
 }
 
+export interface LoanScheduleEntry {
+  id: string;
+  dueDate: string;
+  amount: number;
+  paidAmount: number;
+}
+
 export interface Loan {
   id: string;
   name: string;
   totalAmount: number;
   paidAmount: number;
   monthlyPayment: number;
-  interestRate: number;
+  monthlyInterestRate: number;
   startDate: string;
-  dueDate: string;
+  dueDay: number;
+  endDate: string;
+  repaymentSchedule: LoanScheduleEntry[];
   type: 'loan' | 'installment';
 }
 
@@ -95,10 +104,11 @@ export interface CreditCard {
   issuer: string;
   network: CreditCardNetwork;
   creditLimit: number;
+  paidAmount: number;
   currentBalance: number;
   statementBalance: number;
   minimumPayment: number;
-  apr: number;
+  monthlyInterestRate: number;
   rewardsRate: number;
   annualFee: number;
   dueDate: string;
