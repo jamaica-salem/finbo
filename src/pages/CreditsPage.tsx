@@ -14,6 +14,7 @@ import { Plus, Trash2, CreditCard, Pencil, ArrowDownLeft, ArrowUpRight, Philippi
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { type CreditCard as CreditCardType } from '@/types/finance';
+import { getCreditCardTotalWithInterest } from '@/lib/interest';
 
 const networkLabels: Record<CreditCardType['network'], string> = {
   visa: 'Visa',
@@ -59,10 +60,11 @@ export default function CreditsPage() {
   const [issuer, setIssuer] = useState('');
   const [network, setNetwork] = useState<CreditCardType['network']>('visa');
   const [creditLimit, setCreditLimit] = useState('0');
+  const [paidAmount, setPaidAmount] = useState('0');
   const [currentBalance, setCurrentBalance] = useState('0');
   const [statementBalance, setStatementBalance] = useState('0');
   const [minimumPayment, setMinimumPayment] = useState('0');
-  const [apr, setApr] = useState('0');
+  const [monthlyInterestRate, setMonthlyInterestRate] = useState('0');
   const [rewardsRate, setRewardsRate] = useState('0');
   const [annualFee, setAnnualFee] = useState('0');
   const [dueDate, setDueDate] = useState('');
@@ -76,10 +78,11 @@ export default function CreditsPage() {
   const [editIssuer, setEditIssuer] = useState('');
   const [editNetwork, setEditNetwork] = useState<CreditCardType['network']>('visa');
   const [editCreditLimit, setEditCreditLimit] = useState('0');
+  const [editPaidAmount, setEditPaidAmount] = useState('0');
   const [editCurrentBalance, setEditCurrentBalance] = useState('0');
   const [editStatementBalance, setEditStatementBalance] = useState('0');
   const [editMinimumPayment, setEditMinimumPayment] = useState('0');
-  const [editApr, setEditApr] = useState('0');
+  const [editMonthlyInterestRate, setEditMonthlyInterestRate] = useState('0');
   const [editRewardsRate, setEditRewardsRate] = useState('0');
   const [editAnnualFee, setEditAnnualFee] = useState('0');
   const [editDueDate, setEditDueDate] = useState('');
@@ -104,10 +107,11 @@ export default function CreditsPage() {
     setEditIssuer(card.issuer);
     setEditNetwork(card.network);
     setEditCreditLimit(String(card.creditLimit));
+    setEditPaidAmount(String(card.paidAmount));
     setEditCurrentBalance(String(card.currentBalance));
     setEditStatementBalance(String(card.statementBalance));
     setEditMinimumPayment(String(card.minimumPayment));
-    setEditApr(String(card.apr));
+    setEditMonthlyInterestRate(String(card.monthlyInterestRate));
     setEditRewardsRate(String(card.rewardsRate));
     setEditAnnualFee(String(card.annualFee));
     setEditDueDate(card.dueDate);
@@ -122,10 +126,11 @@ export default function CreditsPage() {
     setIssuer('');
     setNetwork('visa');
     setCreditLimit('0');
+    setPaidAmount('0');
     setCurrentBalance('0');
     setStatementBalance('0');
     setMinimumPayment('0');
-    setApr('0');
+    setMonthlyInterestRate('0');
     setRewardsRate('0');
     setAnnualFee('0');
     setDueDate('');
@@ -138,6 +143,7 @@ export default function CreditsPage() {
     if (!name || !issuer) return;
 
     const limit = parseFloat(creditLimit) || 0;
+    const paid = parseFloat(paidAmount) || 0;
     const current = parseFloat(currentBalance) || 0;
     const statement = parseFloat(statementBalance) || 0;
 
@@ -146,10 +152,11 @@ export default function CreditsPage() {
       issuer,
       network,
       creditLimit: limit,
+      paidAmount: paid,
       currentBalance: current,
       statementBalance: statement,
       minimumPayment: parseFloat(minimumPayment) || 0,
-      apr: parseFloat(apr) || 0,
+      monthlyInterestRate: parseFloat(monthlyInterestRate) || 0,
       rewardsRate: parseFloat(rewardsRate) || 0,
       annualFee: parseFloat(annualFee) || 0,
       dueDate,
@@ -171,10 +178,11 @@ export default function CreditsPage() {
       issuer: editIssuer,
       network: editNetwork,
       creditLimit: parseFloat(editCreditLimit) || 0,
+      paidAmount: parseFloat(editPaidAmount) || 0,
       currentBalance: parseFloat(editCurrentBalance) || 0,
       statementBalance: parseFloat(editStatementBalance) || 0,
       minimumPayment: parseFloat(editMinimumPayment) || 0,
-      apr: parseFloat(editApr) || 0,
+      monthlyInterestRate: parseFloat(editMonthlyInterestRate) || 0,
       rewardsRate: parseFloat(editRewardsRate) || 0,
       annualFee: parseFloat(editAnnualFee) || 0,
       dueDate: editDueDate,
@@ -216,7 +224,8 @@ export default function CreditsPage() {
   };
 
   const renderCard = (card: CreditCardType) => {
-    const utilization = card.creditLimit > 0 ? Math.min(100, Math.round((card.currentBalance / card.creditLimit) * 100)) : 0;
+    const totalDue = getCreditCardTotalWithInterest(card);
+    const utilization = totalDue > 0 ? Math.min(100, Math.round((card.paidAmount / totalDue) * 100)) : 0;
     const available = card.creditLimit - card.currentBalance;
     const utilizationTone = utilization >= 80 ? 'text-destructive' : utilization >= 50 ? 'text-warning' : 'text-success';
     const utilizationLabel = utilization >= 80 ? 'High' : utilization >= 50 ? 'Watch' : 'Healthy';
@@ -254,13 +263,13 @@ export default function CreditsPage() {
 
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
-            <span className="text-muted-foreground">Utilization</span>
+            <span className="text-muted-foreground">Payment progress</span>
             <span className={cn('font-medium', utilizationTone)}>{utilization}%</span>
           </div>
           <Progress value={utilization} className="h-2.5" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatCurrency(currency, card.currentBalance)} balance</span>
-            <span>{formatCurrency(currency, card.creditLimit)} limit</span>
+            <span>{formatCurrency(currency, card.paidAmount)} paid</span>
+            <span>{formatCurrency(currency, totalDue)} total with interest</span>
           </div>
         </div>
 
@@ -282,9 +291,9 @@ export default function CreditsPage() {
           <div className="rounded-lg border border-border bg-background/40 p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <Percent className="h-3.5 w-3.5" />
-              <span>APR</span>
+              <span>Monthly rate</span>
             </div>
-            <p className="mt-1 font-medium text-foreground">{card.apr}%</p>
+            <p className="mt-1 font-medium text-foreground">{card.monthlyInterestRate}%</p>
           </div>
           <div className="rounded-lg border border-border bg-background/40 p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -360,6 +369,10 @@ export default function CreditsPage() {
                 <Input placeholder="0.00" type="number" value={creditLimit} onChange={(e) => setCreditLimit(e.target.value)} />
               </div>
               <div className="space-y-1.5">
+                <Label>Paid amount</Label>
+                <Input placeholder="0.00" type="number" value={paidAmount} onChange={(e) => setPaidAmount(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
                 <Label>Current balance</Label>
                 <Input placeholder="0.00" type="number" value={currentBalance} onChange={(e) => setCurrentBalance(e.target.value)} />
               </div>
@@ -372,8 +385,8 @@ export default function CreditsPage() {
                 <Input placeholder="0.00" type="number" value={minimumPayment} onChange={(e) => setMinimumPayment(e.target.value)} />
               </div>
               <div className="space-y-1.5">
-                <Label>APR %</Label>
-                <Input placeholder="0" type="number" value={apr} onChange={(e) => setApr(e.target.value)} />
+                <Label>Monthly interest rate %</Label>
+                <Input placeholder="0" type="number" value={monthlyInterestRate} onChange={(e) => setMonthlyInterestRate(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label>Rewards rate %</Label>
@@ -501,6 +514,10 @@ export default function CreditsPage() {
               <Input type="number" value={editCreditLimit} onChange={(e) => setEditCreditLimit(e.target.value)} />
             </div>
             <div className="space-y-1.5">
+              <Label>Paid amount</Label>
+              <Input type="number" value={editPaidAmount} onChange={(e) => setEditPaidAmount(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
               <Label>Current balance</Label>
               <Input type="number" value={editCurrentBalance} onChange={(e) => setEditCurrentBalance(e.target.value)} />
             </div>
@@ -513,8 +530,8 @@ export default function CreditsPage() {
               <Input type="number" value={editMinimumPayment} onChange={(e) => setEditMinimumPayment(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label>APR %</Label>
-              <Input type="number" value={editApr} onChange={(e) => setEditApr(e.target.value)} />
+              <Label>Monthly interest rate %</Label>
+              <Input type="number" value={editMonthlyInterestRate} onChange={(e) => setEditMonthlyInterestRate(e.target.value)} />
             </div>
             <div className="space-y-1.5">
               <Label>Rewards rate %</Label>
