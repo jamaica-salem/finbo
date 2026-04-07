@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
 import { StatCard } from '@/components/StatCard';
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { SavingsGoalCategory } from '@/types/finance';
 
-const GOAL_CATEGORIES: SavingsGoalCategory[] = ['Vacation', 'Emergency Fund', 'Home', 'Education', 'Tech', 'Other'];
+const DEFAULT_GOAL_CATEGORIES: SavingsGoalCategory[] = ['Vacation', 'Emergency Fund', 'Home', 'Education', 'Tech', 'Other'];
 
 const formatMoney = (currency: string, amount: number) =>
   `${currency}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -36,6 +36,7 @@ export default function SavingsGoalsPage() {
     deleteSavingsGoal,
     addSavingsContribution,
     currency,
+    savingsCategories,
   } = useFinanceStore();
 
   const [showAdd, setShowAdd] = useState(false);
@@ -212,6 +213,10 @@ export default function SavingsGoalsPage() {
   };
 
   const recentContributions = savingsGoalContributions.slice(0, 5);
+  const goalCategories = useMemo(
+    () => [...new Set([...DEFAULT_GOAL_CATEGORIES, ...savingsCategories])],
+    [savingsCategories],
+  );
 
   return (
     <div className="space-y-6">
@@ -237,10 +242,10 @@ export default function SavingsGoalsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label>Category</Label>
-                <Select value={category} onValueChange={(v) => setCategory(v as SavingsGoalCategory)}>
+                <Select value={category} onValueChange={(v) => setCategory(v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {GOAL_CATEGORIES.map((item) => (
+                    {goalCategories.map((item) => (
                       <SelectItem key={item} value={item}>{item}</SelectItem>
                     ))}
                   </SelectContent>
@@ -347,10 +352,10 @@ export default function SavingsGoalsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Category</Label>
-              <Select value={editCategory} onValueChange={(v) => setEditCategory(v as SavingsGoalCategory)}>
+              <Select value={editCategory} onValueChange={(v) => setEditCategory(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {GOAL_CATEGORIES.map((item) => (
+                  {goalCategories.map((item) => (
                     <SelectItem key={item} value={item}>{item}</SelectItem>
                   ))}
                 </SelectContent>
