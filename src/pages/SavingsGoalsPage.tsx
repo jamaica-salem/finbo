@@ -57,6 +57,9 @@ export default function SavingsGoalsPage() {
   const [editTargetAmount, setEditTargetAmount] = useState('0');
   const [editTargetDate, setEditTargetDate] = useState('');
   const [editNote, setEditNote] = useState('');
+  const [addErrors, setAddErrors] = useState<{ name?: string; targetAmount?: string }>({});
+  const [editErrors, setEditErrors] = useState<{ name?: string; targetAmount?: string }>({});
+  const [contributionError, setContributionError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
 
   const totalTarget = savingsGoals.reduce((sum, goal) => sum + goal.targetAmount, 0);
@@ -75,13 +78,22 @@ export default function SavingsGoalsPage() {
     setEditTargetAmount(String(goal.targetAmount));
     setEditTargetDate(goal.targetDate ?? '');
     setEditNote(goal.note ?? '');
+    setEditErrors({});
   };
 
   const handleAddGoal = () => {
-    if (!name || !targetAmount) return;
+    setAddErrors({});
+    const errors: typeof addErrors = {};
+    if (!name.trim()) errors.name = 'Goal name is required';
+    if (!(parseFloat(targetAmount) > 0)) errors.targetAmount = 'Target amount must be greater than 0';
+    if (Object.keys(errors).length > 0) {
+      setAddErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     addSavingsGoal({
-      name,
+      name: name.trim(),
       category,
       targetAmount: parseFloat(targetAmount) || 0,
       savedAmount: Math.max(0, parseFloat(savedAmount) || 0),
@@ -95,14 +107,24 @@ export default function SavingsGoalsPage() {
     setSavedAmount('0');
     setTargetDate('');
     setNote('');
+    setAddErrors({});
     setShowAdd(false);
   };
 
   const handleEditGoal = () => {
-    if (!editGoalId || !editName || !editTargetAmount) return;
+    setEditErrors({});
+    const errors: typeof editErrors = {};
+    if (!editGoalId) return;
+    if (!editName.trim()) errors.name = 'Goal name is required';
+    if (!(parseFloat(editTargetAmount) > 0)) errors.targetAmount = 'Target amount must be greater than 0';
+    if (Object.keys(errors).length > 0) {
+      setEditErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
 
     updateSavingsGoal(editGoalId, {
-      name: editName,
+      name: editName.trim(),
       category: editCategory,
       targetAmount: parseFloat(editTargetAmount) || 0,
       targetDate: editTargetDate,
@@ -112,11 +134,17 @@ export default function SavingsGoalsPage() {
   };
 
   const handleContribution = () => {
-    if (!contributeGoalId || !contributionAmount) return;
+    setContributionError(null);
+    if (!contributeGoalId) return;
     const goal = savingsGoals.find((item) => item.id === contributeGoalId);
     if (!goal) return;
 
     const amount = Math.max(0, parseFloat(contributionAmount) || 0);
+    if (!(amount > 0)) {
+      setContributionError('Amount must be greater than 0');
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
     const wasComplete = goal.savedAmount >= goal.targetAmount;
 
     addSavingsContribution(contributeGoalId, amount, contributionNote || undefined);
@@ -133,6 +161,7 @@ export default function SavingsGoalsPage() {
 
     setContributionAmount('0');
     setContributionNote('');
+    setContributionError(null);
     setContributeGoalId(null);
   };
 
@@ -224,7 +253,13 @@ export default function SavingsGoalsPage() {
         title="Savings Goals"
         description="Set targets, track progress, and celebrate every win"
         actions={
-        <Dialog open={showAdd} onOpenChange={setShowAdd}>
+        <Dialog
+          open={showAdd}
+          onOpenChange={(open) => {
+            setShowAdd(open);
+            if (!open) setAddErrors({});
+          }}
+        >
           <DialogTrigger asChild>
             <Button size="sm">
               <Plus className="mr-1 h-4 w-4" />
@@ -239,6 +274,7 @@ export default function SavingsGoalsPage() {
               <div className="space-y-1.5">
                 <Label>Goal name</Label>
                 <Input placeholder="e.g. Vacation to Japan" value={name} onChange={(e) => setName(e.target.value)} />
+                {addErrors.name ? <p className="text-sm text-destructive">{addErrors.name}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Category</Label>
@@ -254,6 +290,7 @@ export default function SavingsGoalsPage() {
               <div className="space-y-1.5">
                 <Label>Target amount</Label>
                 <Input type="number" placeholder="0.00" value={targetAmount} onChange={(e) => setTargetAmount(e.target.value)} />
+                {addErrors.targetAmount ? <p className="text-sm text-destructive">{addErrors.targetAmount}</p> : null}
               </div>
               <div className="space-y-1.5">
                 <Label>Start saved amount</Label>
@@ -321,7 +358,13 @@ export default function SavingsGoalsPage() {
         </div>
       </div>
 
-      <Dialog open={!!contributeGoalId} onOpenChange={() => setContributeGoalId(null)}>
+      <Dialog
+        open={!!contributeGoalId}
+        onOpenChange={() => {
+          setContributeGoalId(null);
+          setContributionError(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Contribution</DialogTitle>
@@ -330,6 +373,7 @@ export default function SavingsGoalsPage() {
             <div className="space-y-1.5">
               <Label>Amount</Label>
               <Input type="number" placeholder="0.00" value={contributionAmount} onChange={(e) => setContributionAmount(e.target.value)} />
+              {contributionError ? <p className="text-sm text-destructive">{contributionError}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Note</Label>
@@ -340,7 +384,13 @@ export default function SavingsGoalsPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editGoalId} onOpenChange={() => setEditGoalId(null)}>
+      <Dialog
+        open={!!editGoalId}
+        onOpenChange={() => {
+          setEditGoalId(null);
+          setEditErrors({});
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Edit Goal</DialogTitle>
@@ -349,6 +399,7 @@ export default function SavingsGoalsPage() {
             <div className="space-y-1.5">
               <Label>Goal name</Label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+              {editErrors.name ? <p className="text-sm text-destructive">{editErrors.name}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Category</Label>
@@ -364,6 +415,7 @@ export default function SavingsGoalsPage() {
             <div className="space-y-1.5">
               <Label>Target amount</Label>
               <Input type="number" value={editTargetAmount} onChange={(e) => setEditTargetAmount(e.target.value)} />
+              {editErrors.targetAmount ? <p className="text-sm text-destructive">{editErrors.targetAmount}</p> : null}
             </div>
             <div className="space-y-1.5">
               <Label>Target date</Label>
