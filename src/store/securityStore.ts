@@ -7,6 +7,7 @@ interface SecurityState {
   autoLockMinutes: number;
   hydrated: boolean;
   setPinRecord: (pinHash: string, pinSalt: string) => void;
+  clearPinRecord: () => void;
   setAutoLockMinutes: (minutes: number) => void;
   setHydrated: (hydrated: boolean) => void;
 }
@@ -21,6 +22,7 @@ export const useSecurityStore = create<SecurityState>()(
       autoLockMinutes: DEFAULT_AUTO_LOCK_MINUTES,
       hydrated: false,
       setPinRecord: (pinHash, pinSalt) => set({ pinHash, pinSalt }),
+          clearPinRecord: () => set({ pinHash: null, pinSalt: null }),
       setAutoLockMinutes: (minutes) => set({ autoLockMinutes: minutes }),
       setHydrated: (hydrated) => set({ hydrated }),
     }),
