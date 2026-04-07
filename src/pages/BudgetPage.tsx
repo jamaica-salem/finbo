@@ -59,6 +59,7 @@ export default function BudgetPage() {
   const [budgetAmount, setBudgetAmount] = useState('0');
   const [budgetThreshold, setBudgetThreshold] = useState('80');
   const [budgetActive, setBudgetActive] = useState(true);
+  const [budgetErrors, setBudgetErrors] = useState<{ category?: string; amount?: string; threshold?: string }>({});
   const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
 
   const now = new Date();
@@ -76,6 +77,7 @@ export default function BudgetPage() {
     setBudgetAmount('0');
     setBudgetThreshold('80');
     setBudgetActive(true);
+    setBudgetErrors({});
     setShowBudgetDialog(true);
   };
 
@@ -85,12 +87,14 @@ export default function BudgetPage() {
     setBudgetAmount(String(budget.limitAmount));
     setBudgetThreshold(String(budget.alertThresholdPct));
     setBudgetActive(budget.active);
+    setBudgetErrors({});
     setShowBudgetDialog(true);
   };
 
   const closeBudgetDialog = () => {
     setShowBudgetDialog(false);
     setEditingBudgetId(null);
+    setBudgetErrors({});
   };
 
   const currentMonthExpenses = useMemo(() => {
@@ -147,18 +151,29 @@ export default function BudgetPage() {
   const alertBudgets = budgetSummaries.filter((budget) => budget.status === 'warning' || budget.status === 'over');
 
   const handleSaveBudget = () => {
-    if (!budgetCategory.trim()) {
-      toast.error('Enter a budget category.');
+    setBudgetErrors({});
+    const errors: typeof budgetErrors = {};
+    if (!budgetCategory.trim()) errors.category = 'Category is required';
+
+    const parsedLimitAmount = Number(budgetAmount);
+    if (!Number.isFinite(parsedLimitAmount) || parsedLimitAmount <= 0) {
+      errors.amount = 'Monthly budget amount must be greater than 0';
+    }
+
+    const parsedThreshold = Number(budgetThreshold);
+    if (!Number.isFinite(parsedThreshold) || parsedThreshold < 1 || parsedThreshold > 100) {
+      errors.threshold = 'Alert threshold must be between 1 and 100';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setBudgetErrors(errors);
+      toast.error('Please fix the highlighted fields');
       return;
     }
 
-    const limitAmount = Math.max(0, Number(budgetAmount));
-    if (!Number.isFinite(limitAmount) || limitAmount <= 0) {
-      toast.error('Enter a valid monthly budget amount.');
-      return;
-    }
+    const limitAmount = parsedLimitAmount;
 
-    const alertThresholdPct = Math.min(100, Math.max(1, Math.floor(Number(budgetThreshold) || 80)));
+    const alertThresholdPct = Math.floor(parsedThreshold);
 
     const payload = {
       category: budgetCategory.trim(),
@@ -229,6 +244,7 @@ export default function BudgetPage() {
                     value={budgetCategory}
                     onChange={(event) => setBudgetCategory(event.target.value)}
                   />
+                  {budgetErrors.category ? <p className="text-sm text-destructive">{budgetErrors.category}</p> : null}
                   <datalist id="budget-category-suggestions">
                     {categorySuggestions.map((item) => (
                       <option key={item} value={item} />
@@ -245,6 +261,7 @@ export default function BudgetPage() {
                     value={budgetAmount}
                     onChange={(event) => setBudgetAmount(event.target.value)}
                   />
+                  {budgetErrors.amount ? <p className="text-sm text-destructive">{budgetErrors.amount}</p> : null}
                 </div>
 
                 <div className="space-y-1.5">
@@ -257,6 +274,7 @@ export default function BudgetPage() {
                     value={budgetThreshold}
                     onChange={(event) => setBudgetThreshold(event.target.value)}
                   />
+                  {budgetErrors.threshold ? <p className="text-sm text-destructive">{budgetErrors.threshold}</p> : null}
                 </div>
 
                 <div className="flex items-center justify-between rounded-xl border border-border/70 px-3 py-2">
