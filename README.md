@@ -44,7 +44,24 @@ Start the application:
 npm run dev
 ```
 
-The application will be available at `http://localhost:3000`.
+The application will be available at `http://localhost:8080`.
+
+## Docker
+
+Build and run the production container:
+
+```bash
+docker compose up --build
+```
+
+Then open `http://localhost:3000`.
+
+If you prefer plain Docker:
+
+```bash
+docker build -t finbo .
+docker run --rm -p 3000:80 finbo
+```
 
 ## Development
 
