@@ -25,7 +25,7 @@ const getCategories = (transaction: { category: string; categories?: string[] })
   (transaction.categories && transaction.categories.length > 0 ? transaction.categories : [transaction.category]).filter(Boolean);
 
 export default function Dashboard() {
-  const { accounts, transactions, loans, bills, creditCards, recurringTransactionRules, currency, categoryColors, transactionCategories, sharedCategories, nickname, addTransaction, addBill, logLoanPayment, logCreditCardPayment, markBillPaid } = useFinanceStore();
+  const { accounts, transactions, loans, bills, creditCards, personalDebts, recurringTransactionRules, currency, categoryColors, transactionCategories, sharedCategories, nickname, addTransaction, addBill, logLoanPayment, logCreditCardPayment, markBillPaid } = useFinanceStore();
 
   // Quick actions state
   const [showAddExpense, setShowAddExpense] = useState(false);
@@ -185,6 +185,12 @@ export default function Dashboard() {
   const totalInstallmentMonthlyPayments = loans.filter((l) => l.type === 'installment').reduce((s, l) => s + Math.max(0, l.monthlyPayment), 0);
   const totalCreditCardDebt = creditCards.reduce((s, card) => s + Math.max(0, card.currentBalance), 0);
   const totalCreditCardMinimumPayments = creditCards.reduce((s, card) => s + Math.max(0, card.minimumPayment), 0);
+  const totalPersonalDebtOwed = personalDebts
+    .filter((debt) => debt.status !== 'settled' && debt.direction === 'iOwe')
+    .reduce((s, debt) => s + Math.max(0, debt.amount - debt.paidAmount), 0);
+  const totalPersonalDebtReceivable = personalDebts
+    .filter((debt) => debt.status !== 'settled' && debt.direction === 'owedToMe')
+    .reduce((s, debt) => s + Math.max(0, debt.amount - debt.paidAmount), 0);
   const activeMonthlyRecurringExpenses = recurringTransactionRules
     .filter((rule) => rule.active && rule.type === 'expense' && rule.frequency === 'monthly')
     .reduce((s, rule) => s + Math.max(0, rule.amount), 0);
@@ -193,13 +199,14 @@ export default function Dashboard() {
     accounts.length > 0 ||
     transactions.length > 0 ||
     loans.length > 0 ||
+    personalDebts.length > 0 ||
     bills.length > 0 ||
     creditCards.length > 0 ||
     recurringTransactionRules.length > 0;
 
   const totalMonthlyPayments = totalBillsDue + totalLoanMonthlyPayments + totalInstallmentMonthlyPayments + totalCreditCardMinimumPayments + activeMonthlyRecurringExpenses;
-  const totalDebts = totalLoanRemaining + totalInstallmentRemaining + totalCreditCardDebt;
-  const netAfterDebts = totalBalance - totalDebts;
+  const totalDebts = totalLoanRemaining + totalInstallmentRemaining + totalCreditCardDebt + totalPersonalDebtOwed;
+  const netAfterDebts = totalBalance + totalPersonalDebtReceivable - totalDebts;
   const nearNegativeNetThreshold = hasFinancialData ? Math.max(1000, totalDebts * 0.1) : 0;
   const isNetNegative = netAfterDebts < 0;
   const isNetNearNegative = hasFinancialData && !isNetNegative && netAfterDebts <= nearNegativeNetThreshold;
@@ -213,9 +220,9 @@ export default function Dashboard() {
     ? 'Add financial data to see net insights'
     : isNetNegative
     ? 'Alert: total debts exceed total balance'
-    : isNetNearNegative
-      ? 'Warning: net is close to negative'
-      : 'Total balance - total debts';
+      : isNetNearNegative
+        ? 'Warning: net is close to negative'
+      : 'Balance + money owed to you - debts';
   const totalLoansCount = loans.filter((l) => l.type === 'loan').length;
   const totalInstallmentsCount = loans.filter((l) => l.type === 'installment').length;
 
@@ -509,7 +516,7 @@ export default function Dashboard() {
         <StatCard
           title="Total Debts"
           value={`${currency}${totalDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle="Loans + installments + credit cards"
+          subtitle="Loans + installments + credit cards + personal debts"
           icon={<CreditCard className="h-5 w-5" />}
         />
       </div>

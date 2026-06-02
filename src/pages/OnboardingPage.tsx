@@ -59,6 +59,8 @@ export default function OnboardingPage() {
       categoryColors: {},
       loans: [],
       loanPayments: [],
+      personalDebts: [],
+      personalDebtPayments: [],
       creditCards: [],
       creditCardActivities: [],
       bills: [],
