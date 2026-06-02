@@ -18,6 +18,8 @@ beforeEach(() => {
     categoryColors: {},
     loans: [],
     loanPayments: [],
+    personalDebts: [],
+    personalDebtPayments: [],
     creditCards: [],
     creditCardActivities: [],
     bills: [],
@@ -123,6 +125,8 @@ describe('finance store - core flows', () => {
       categoryColors: {},
       loans: [],
       loanPayments: [],
+      personalDebts: [],
+      personalDebtPayments: [],
       creditCards: [],
       creditCardActivities: [],
       bills: [],
@@ -134,5 +138,30 @@ describe('finance store - core flows', () => {
     st().replaceFinanceData(snapshot as any);
     expect(st().accounts.length).toBe(1);
     expect(st().accounts[0].name).toBe('Snap');
+  });
+
+  it('tracks personal debts and settles them through payments', () => {
+    const st = () => useFinanceStore.getState();
+
+    st().addPersonalDebt({
+      personName: 'Mia',
+      direction: 'owedToMe',
+      amount: 1000,
+      paidAmount: 200,
+      dueDate: todayKey(),
+      note: 'shared expense',
+    });
+
+    const debt = st().personalDebts.find((item) => item.personName === 'Mia')!;
+    expect(debt.status).toBe('active');
+    expect(debt.paidAmount).toBe(200);
+
+    st().logPersonalDebtPayment(debt.id, 900, 'settled');
+
+    const updated = st().personalDebts.find((item) => item.id === debt.id)!;
+    expect(updated.paidAmount).toBe(1000);
+    expect(updated.status).toBe('settled');
+    expect(st().personalDebtPayments.length).toBe(1);
+    expect(st().personalDebtPayments[0].amount).toBe(800);
   });
 });
