@@ -18,6 +18,7 @@ export const buildFinanceBackupSnapshot = (data: FinanceDataState): FinanceBacku
   data: {
     accounts: [...toArray<Account>(data.accounts)],
     transactions: [...toArray<Transaction>(data.transactions)],
+    recurringTransactionRules: [...toArray(data.recurringTransactionRules)],
     loans: [...toArray(data.loans)],
     loanPayments: [...toArray(data.loanPayments)],
     personalDebts: [...toArray(data.personalDebts)],
@@ -63,6 +64,9 @@ export const normalizeFinanceBackupSnapshot = (value: unknown): FinanceBackupSna
     data: {
       accounts: data.accounts as Account[],
       transactions: data.transactions as Transaction[],
+      recurringTransactionRules: Array.isArray(data.recurringTransactionRules)
+        ? (data.recurringTransactionRules as FinanceDataState['recurringTransactionRules'])
+        : [],
       loans: data.loans as FinanceDataState['loans'],
       loanPayments: data.loanPayments as FinanceDataState['loanPayments'],
       personalDebts: Array.isArray(data.personalDebts) ? (data.personalDebts as FinanceDataState['personalDebts']) : [],
