@@ -188,7 +188,7 @@ export default function OnboardingPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              This replaces your current data with a realistic starter set that includes accounts, transactions, budgets, bills, loans, cards, and savings goals.
+              This replaces your current data with a realistic starter set that includes accounts, transactions, budgets, bills, loans, debts, cards, and savings goals.
             </p>
             <div className="flex items-center gap-2">
               <Button onClick={() => setShowSampleConfirm(true)}>
