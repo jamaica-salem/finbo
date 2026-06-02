@@ -14,61 +14,9 @@ import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { buildTransactionCategoryOptions, getCategoryColor } from '@/lib/transactionCategories';
 import type { AccountType, RecurringTransactionFrequency } from '@/types/finance';
-const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, cash: Wallet, 'e-wallet': Smartphone };
+const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, 'digital-bank': Building2, cash: Wallet, 'e-wallet': Smartphone };
+const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = { bank: 'Bank', 'digital-bank': 'Digital Bank', cash: 'Cash', 'e-wallet': 'E-Wallet' };
 const TRANSACTIONS_PER_PAGE = 20;
-const ACCOUNT_NAME_GROUPS = [
-  {
-    label: 'Banks',
-    options: ['BankCom', 'BDO', 'BPI', 'Metrobank', 'UnionBank', 'LANDBANK', 'RCBC'],
-  },
-  {
-    label: 'Digital Banks',
-    options: ['Maya Bank', 'GoTyme', 'MariBank', 'CIMB', 'Tonik', 'UNO'],
-  },
-  {
-    label: 'E-Wallets',
-    options: ['GCash', 'Maya', 'GrabPay', 'ShopeePay', 'Coins.ph', 'PalawanPay'],
-  },
-  {
-    label: 'Cash',
-    options: ['Cash'],
-  },
-];
-const ACCOUNT_NAME_OPTIONS = ACCOUNT_NAME_GROUPS.flatMap((group) => group.options);
-const E_WALLET_ACCOUNT_NAMES = new Set(ACCOUNT_NAME_GROUPS.find((group) => group.label === 'E-Wallets')?.options ?? []);
-const getAccountTypeFromName = (name: string): AccountType => {
-  if (name === 'Cash') return 'cash';
-  if (E_WALLET_ACCOUNT_NAMES.has(name)) return 'e-wallet';
-  return 'bank';
-};
-
-function AccountNameSelect({
-  value,
-  onValueChange,
-  placeholder = 'Select account',
-}: {
-  value: string;
-  onValueChange: (value: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger><SelectValue placeholder={placeholder} /></SelectTrigger>
-      <SelectContent>
-        {ACCOUNT_NAME_GROUPS.map((group) => (
-          <div key={group.label}>
-            <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {group.label}
-            </div>
-            {group.options.map((option) => (
-              <SelectItem key={option} value={option}>{option}</SelectItem>
-            ))}
-          </div>
-        ))}
-      </SelectContent>
-    </Select>
-  );
-}
 
 export default function AccountsPage() {
   const {
@@ -111,11 +59,13 @@ export default function AccountsPage() {
   // Edit account
   const [editAccountId, setEditAccountId] = useState<string | null>(null);
   const [editAName, setEditAName] = useState('');
+  const [editAType, setEditAType] = useState<AccountType>('bank');
   const [editABal, setEditABal] = useState('0');
   const [editAccountErrors, setEditAccountErrors] = useState<{ name?: string; balance?: string }>({});
 
   // Add account form
   const [aName, setAName] = useState('');
+  const [aType, setAType] = useState<AccountType>('bank');
   const [aBal, setABal] = useState('0');
   const [addAccountErrors, setAddAccountErrors] = useState<{ name?: string; balance?: string }>({});
 
@@ -192,15 +142,16 @@ export default function AccountsPage() {
     setAddAccountErrors({});
     const errors: typeof addAccountErrors = {};
     const balance = Number(aBal);
-    if (!aName.trim()) errors.name = 'Select an account';
+    if (!aName.trim()) errors.name = 'Account name is required';
     if (!Number.isFinite(balance) || balance < 0) errors.balance = 'Initial balance cannot be negative';
     if (Object.keys(errors).length > 0) {
       setAddAccountErrors(errors);
       toast.error('Please fix the highlighted fields');
       return;
     }
-    addAccount({ name: aName.trim(), type: getAccountTypeFromName(aName), balance, currency, color: 'hsl(172, 66%, 40%)' });
+    addAccount({ name: aName.trim(), type: aType, balance, currency, color: 'hsl(172, 66%, 40%)' });
     setAName('');
+    setAType('bank');
     setABal('0');
     setAddAccountErrors({});
     setShowAddAccount(false);
@@ -211,7 +162,8 @@ export default function AccountsPage() {
     if (!acc) return;
     setEditAccountErrors({});
     setEditAccountId(id);
-    setEditAName(ACCOUNT_NAME_OPTIONS.includes(acc.name) ? acc.name : '');
+    setEditAName(acc.name);
+    setEditAType(acc.type);
     setEditABal(String(acc.balance));
   };
 
@@ -220,14 +172,14 @@ export default function AccountsPage() {
     const errors: typeof editAccountErrors = {};
     if (!editAccountId) return;
     const balance = Number(editABal);
-    if (!editAName.trim()) errors.name = 'Select an account';
+    if (!editAName.trim()) errors.name = 'Account name is required';
     if (!Number.isFinite(balance) || balance < 0) errors.balance = 'Balance cannot be negative';
     if (Object.keys(errors).length > 0) {
       setEditAccountErrors(errors);
       toast.error('Please fix the highlighted fields');
       return;
     }
-    updateAccount(editAccountId, { name: editAName.trim(), type: getAccountTypeFromName(editAName), balance });
+    updateAccount(editAccountId, { name: editAName.trim(), type: editAType, balance });
     setEditAccountErrors({});
     setEditAccountId(null);
   };
@@ -674,12 +626,20 @@ export default function AccountsPage() {
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label>Account name</Label>
-                  <AccountNameSelect
-                    value={aName}
-                    onValueChange={setAName}
-                    placeholder="Select account"
-                  />
+                  <Input placeholder="e.g. Main Bank" value={aName} onChange={(e) => setAName(e.target.value)} />
                   {addAccountErrors.name ? <p className="text-sm text-destructive">{addAccountErrors.name}</p> : null}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Type</Label>
+                  <Select value={aType} onValueChange={(v) => setAType(v as AccountType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="bank">Bank</SelectItem>
+                      <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                      <SelectItem value="digital-bank">Digital Bank</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1.5">
                   <Label>Initial balance</Label>
@@ -793,12 +753,20 @@ export default function AccountsPage() {
           <div className="space-y-4">
             <div className="space-y-1.5">
               <Label>Account name</Label>
-              <AccountNameSelect
-                value={editAName}
-                onValueChange={setEditAName}
-                placeholder="Select account"
-              />
+              <Input placeholder="e.g. Main Bank" value={editAName} onChange={(e) => setEditAName(e.target.value)} />
               {editAccountErrors.name ? <p className="text-sm text-destructive">{editAccountErrors.name}</p> : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Type</Label>
+              <Select value={editAType} onValueChange={(v) => setEditAType(v as AccountType)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank">Bank</SelectItem>
+                  <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                  <SelectItem value="digital-bank">Digital Bank</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Balance</Label>
@@ -1088,7 +1056,7 @@ export default function AccountsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{a.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{a.type}</p>
+                    <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[a.type]}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">
