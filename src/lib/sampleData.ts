@@ -7,6 +7,7 @@ import type {
   FinanceDataState,
   Loan,
   MonthlyBudget,
+  PersonalDebt,
   RecurringTransactionRule,
   SavingsGoal,
   Transaction,
@@ -336,6 +337,33 @@ export const generateSampleFinanceData = (currency = '₱'): FinanceDataState =>
     },
   ];
 
+  const personalDebts: PersonalDebt[] = [
+    {
+      id: uid('debt'),
+      personName: 'Mia Santos',
+      direction: 'owedToMe',
+      amount: 3500,
+      paidAmount: 1000,
+      dueDate: isoDaysFromNow(7),
+      note: 'Dinner and tickets split',
+      createdAt: isoDaysAgo(6),
+      updatedAt: isoDaysAgo(1),
+      status: 'active',
+    },
+    {
+      id: uid('debt'),
+      personName: 'Paolo Reyes',
+      direction: 'iOwe',
+      amount: 2200,
+      paidAmount: 0,
+      dueDate: isoDaysFromNow(3),
+      note: 'Borrowed cash',
+      createdAt: isoDaysAgo(2),
+      updatedAt: isoDaysAgo(2),
+      status: 'active',
+    },
+  ];
+
   const bills: Bill[] = [
     {
       id: uid('bill'),
@@ -436,6 +464,8 @@ export const generateSampleFinanceData = (currency = '₱'): FinanceDataState =>
     categoryColors,
     loans,
     loanPayments: [],
+    personalDebts,
+    personalDebtPayments: [],
     creditCards,
     creditCardActivities: [],
     bills,
