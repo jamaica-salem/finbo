@@ -984,6 +984,7 @@ export const useFinanceStore = create<FinanceState>()(
             paidAmount: card.paidAmount + applied,
             currentBalance: Math.max(0, card.currentBalance - applied),
             statementBalance: Math.max(0, card.statementBalance - applied),
+            minimumPayment: Math.max(0, card.minimumPayment - applied),
             rewardsPoints: card.rewardsPoints,
             openedDate: card.openedDate,
             lastPaymentDate: payment.date,

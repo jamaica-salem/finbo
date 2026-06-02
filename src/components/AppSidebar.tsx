@@ -8,12 +8,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/accounts', label: 'Accounts', icon: Wallet },
+  { to: '/bills', label: 'Bills', icon: Receipt },
   { to: '/loans', label: 'Loans', icon: TrendingDown },
   { to: '/debts', label: 'Debts', icon: HandCoins },
   { to: '/credits', label: 'Credits', icon: CreditCard },
   { to: '/savings', label: 'Savings', icon: PiggyBank },
   { to: '/budget', label: 'Budget', icon: Target },
-  { to: '/bills', label: 'Bills', icon: Receipt },
   { to: '/categories', label: 'Categories', icon: Tag },
   { to: '/analytics', label: 'Analytics', icon: BarChart3 },
 ];
