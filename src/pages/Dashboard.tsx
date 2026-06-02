@@ -262,6 +262,7 @@ export default function Dashboard() {
   const totalPersonalDebtReceivable = personalDebts
     .filter((debt) => debt.status !== 'settled' && debt.direction === 'owedToMe')
     .reduce((sum, debt) => sum + Math.max(0, debt.amount - debt.paidAmount), 0);
+  const activeReceivablesCount = personalDebts.filter((debt) => debt.status !== 'settled' && debt.direction === 'owedToMe').length;
   const activeMonthlyRecurringExpenses = recurringTransactionRules
     .filter((rule) => rule.active && rule.type === 'expense' && rule.frequency === 'monthly')
     .reduce((sum, rule) => sum + Math.max(0, rule.amount), 0);
@@ -571,9 +572,9 @@ export default function Dashboard() {
           icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
-          title="Monthly Bills"
-          value={`${currency}${totalBillsDue.toFixed(2)}`}
-          subtitle={`${paidBills}/${bills.length} paid`}
+          title="Total Owed To Me"
+          value={`${currency}${totalPersonalDebtReceivable.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle={`${activeReceivablesCount} active receivable${activeReceivablesCount === 1 ? '' : 's'}`}
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
