@@ -667,7 +667,7 @@ export default function AccountsPage() {
               }}
             >
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />Account</Button>
+              <Button className="order-3" size="sm"><Plus className="h-4 w-4 mr-1" />Account</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
@@ -698,7 +698,7 @@ export default function AccountsPage() {
             }}
           >
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Transaction</Button>
+              <Button className="order-2" variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />Transaction</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
