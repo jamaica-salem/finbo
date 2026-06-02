@@ -1,6 +1,7 @@
 import { useFinanceStore } from '@/store/financeStore';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -9,7 +10,7 @@ import { buildTransactionCategoryOptions } from '@/lib/transactionCategories';
 import { useState, useMemo } from 'react';
 import { StatCard } from '@/components/StatCard';
 import { PageHeader } from '@/components/PageHeader';
-import { PhilippinePeso, Receipt, TrendingUp, CreditCard, CalendarClock } from 'lucide-react';
+import { PhilippinePeso, Receipt, TrendingUp, CreditCard, CalendarClock, Plus } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
@@ -260,10 +261,21 @@ export default function Dashboard() {
         description={nickname ? `Here is your money snapshot today. You are doing great keeping it on track.` : 'Here is your money snapshot today. You are doing great keeping it on track.'}
         actions={
           <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button size="icon" aria-label="Open quick actions">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => setShowAddExpense(true)}>Add expense</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShowAddIncome(true)}>Add income</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShowAddBillQuick(true)}>Add bill</DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setShowLogPayment(true)}>Log payment</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             <Dialog open={showAddExpense} onOpenChange={setShowAddExpense}>
-              <DialogTrigger asChild>
-                <Button size="sm">Add expense</Button>
-              </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Add expense</DialogTitle></DialogHeader>
                 <div className="space-y-3">
@@ -299,9 +311,6 @@ export default function Dashboard() {
             </Dialog>
 
             <Dialog open={showAddIncome} onOpenChange={setShowAddIncome}>
-              <DialogTrigger asChild>
-                <Button size="sm">Add income</Button>
-              </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Add income</DialogTitle></DialogHeader>
                 <div className="space-y-3">
@@ -337,9 +346,6 @@ export default function Dashboard() {
             </Dialog>
 
             <Dialog open={showAddBillQuick} onOpenChange={setShowAddBillQuick}>
-              <DialogTrigger asChild>
-                <Button size="sm">Add bill</Button>
-              </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Add bill</DialogTitle></DialogHeader>
                 <div className="space-y-3">
@@ -370,9 +376,6 @@ export default function Dashboard() {
             </Dialog>
 
             <Dialog open={showLogPayment} onOpenChange={setShowLogPayment}>
-              <DialogTrigger asChild>
-                <Button size="sm">Log payment</Button>
-              </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Log payment</DialogTitle></DialogHeader>
                 <div className="space-y-3">
