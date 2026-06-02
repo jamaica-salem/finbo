@@ -109,6 +109,30 @@ export interface LoanPayment {
   note?: string;
 }
 
+export type PersonalDebtDirection = 'iOwe' | 'owedToMe';
+export type PersonalDebtStatus = 'active' | 'settled';
+
+export interface PersonalDebt {
+  id: string;
+  personName: string;
+  direction: PersonalDebtDirection;
+  amount: number;
+  paidAmount: number;
+  dueDate?: string;
+  note?: string;
+  createdAt: string;
+  updatedAt: string;
+  status: PersonalDebtStatus;
+}
+
+export interface PersonalDebtPayment {
+  id: string;
+  debtId: string;
+  amount: number;
+  date: string;
+  note?: string;
+}
+
 export type CreditCardNetwork = 'visa' | 'mastercard' | 'amex' | 'discover' | 'jcb' | 'unionpay' | 'other';
 
 export interface CreditCard {
@@ -204,6 +228,8 @@ export interface FinanceDataState {
   categoryColors: Record<string, string>;
   loans: Loan[];
   loanPayments: LoanPayment[];
+  personalDebts: PersonalDebt[];
+  personalDebtPayments: PersonalDebtPayment[];
   creditCards: CreditCard[];
   creditCardActivities: CreditCardActivity[];
   bills: Bill[];
