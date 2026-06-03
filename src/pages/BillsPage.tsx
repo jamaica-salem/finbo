@@ -334,7 +334,12 @@ export default function BillsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Due date</Label>
-                  <Input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
+                  <Input 
+                    type="date" 
+                    value={dueDate} 
+                    onChange={(event) => setDueDate(event.target.value)}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
                   {addErrors.dueDate ? <p className="text-sm text-destructive">{addErrors.dueDate}</p> : null}
                 </div>
                 <div className="flex items-center justify-between pt-2">
@@ -416,7 +421,12 @@ export default function BillsPage() {
             </div>
             <div className="space-y-1.5">
               <Label>Due date</Label>
-              <Input type="date" value={editDueDate} onChange={(event) => setEditDueDate(event.target.value)} />
+              <Input 
+                type="date" 
+                value={editDueDate} 
+                onChange={(event) => setEditDueDate(event.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+              />
               {editErrors.dueDate ? <p className="text-sm text-destructive">{editErrors.dueDate}</p> : null}
             </div>
             <div className="flex items-center justify-between pt-2">
