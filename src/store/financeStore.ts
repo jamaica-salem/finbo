@@ -12,6 +12,8 @@ import type {
   Loan,
   LoanScheduleEntry,
   LoanPayment,
+  PersonalDebt,
+  PersonalDebtPayment,
   Bill,
   BillInstance,
   CreditCard,
@@ -261,6 +263,27 @@ const normalizeCreditCard = (card: Partial<CreditCard>): CreditCard => ({
   lastPaymentDate: isIsoDate(card.lastPaymentDate) ? card.lastPaymentDate : undefined,
 });
 
+const normalizePersonalDebt = (debt: Partial<PersonalDebt>): PersonalDebt => {
+  const amount = Math.max(0, typeof debt.amount === 'number' ? debt.amount : Number(debt.amount) || 0);
+  const paidAmount = Math.min(amount, Math.max(0, typeof debt.paidAmount === 'number' ? debt.paidAmount : Number(debt.paidAmount) || 0));
+  const createdAt = isIsoDate(debt.createdAt) ? debt.createdAt : new Date().toISOString().split('T')[0];
+  const updatedAt = isIsoDate(debt.updatedAt) ? debt.updatedAt : createdAt;
+  const status = debt.status === 'settled' || paidAmount >= amount ? 'settled' : 'active';
+
+  return {
+    id: debt.id ?? uid(),
+    personName: debt.personName?.trim() || 'Unnamed person',
+    direction: debt.direction === 'owedToMe' ? 'owedToMe' : 'iOwe',
+    amount,
+    paidAmount,
+    dueDate: isIsoDate(debt.dueDate) ? debt.dueDate : undefined,
+    note: debt.note?.trim() || undefined,
+    createdAt,
+    updatedAt,
+    status,
+  };
+};
+
 const initialAccounts: Account[] = [];
 
 const initialTransactions: Transaction[] = [];
@@ -273,6 +296,10 @@ const initialBudgets: MonthlyBudget[] = [];
 const initialCategoryColors: Record<string, string> = {};
 
 const initialLoans: Loan[] = [];
+
+const initialPersonalDebts: PersonalDebt[] = [];
+
+const initialPersonalDebtPayments: PersonalDebtPayment[] = [];
 
 const initialCreditCards: CreditCard[] = [];
 
@@ -288,6 +315,7 @@ type UndoEntryType =
   | 'deleteTransaction'
   | 'deleteBill'
   | 'deleteLoan'
+  | 'deletePersonalDebt'
   | 'deleteCreditCard'
   | 'deleteSavingsGoal'
   | 'replace';
@@ -312,6 +340,8 @@ interface FinanceState {
   categoryColors: Record<string, string>;
   loans: Loan[];
   loanPayments: LoanPayment[];
+  personalDebts: PersonalDebt[];
+  personalDebtPayments: PersonalDebtPayment[];
   creditCards: CreditCard[];
   creditCardActivities: CreditCardActivity[];
   bills: Bill[];
@@ -358,6 +388,12 @@ interface FinanceState {
   deleteLoan: (id: string) => void;
   logLoanPayment: (loanId: string, amount: number, note?: string) => void;
 
+  // Personal debt actions
+  addPersonalDebt: (debt: Omit<PersonalDebt, 'id' | 'createdAt' | 'updatedAt' | 'status'> & { status?: PersonalDebt['status'] }) => void;
+  updatePersonalDebt: (id: string, data: Partial<PersonalDebt>) => void;
+  deletePersonalDebt: (id: string) => void;
+  logPersonalDebtPayment: (debtId: string, amount: number, note?: string) => void;
+
   // Credit card actions
   addCreditCard: (card: Omit<CreditCard, 'id'>) => void;
   updateCreditCard: (id: string, data: Partial<CreditCard>) => void;
@@ -398,6 +434,8 @@ export const useFinanceStore = create<FinanceState>()(
       categoryColors: initialCategoryColors,
       loans: initialLoans,
       loanPayments: [],
+      personalDebts: initialPersonalDebts,
+      personalDebtPayments: initialPersonalDebtPayments,
       creditCards: initialCreditCards,
       creditCardActivities: initialCreditCardActivities,
       bills: initialBills,
@@ -851,6 +889,67 @@ export const useFinanceStore = create<FinanceState>()(
         return { loanPayments: [...s.loanPayments, payment], loans };
       }),
 
+      addPersonalDebt: (debt) => set((s) => {
+        const now = new Date().toISOString().split('T')[0];
+        const nextDebt = normalizePersonalDebt({
+          ...debt,
+          id: uid(),
+          createdAt: now,
+          updatedAt: now,
+        });
+        return { personalDebts: [nextDebt, ...s.personalDebts] };
+      }),
+      updatePersonalDebt: (id, data) => set((s) => ({
+        personalDebts: s.personalDebts.map((debt) => {
+          if (debt.id !== id) return debt;
+          return normalizePersonalDebt({
+            ...debt,
+            ...data,
+            id,
+            updatedAt: new Date().toISOString().split('T')[0],
+          });
+        }),
+      })),
+      deletePersonalDebt: (id) => set((s) => {
+        const idx = s.personalDebts.findIndex((debt) => debt.id === id);
+        const item = s.personalDebts[idx];
+        if (!item) return s;
+        const payments = s.personalDebtPayments.filter((payment) => payment.debtId === id);
+        const undoEntry: UndoEntry = { id: uid(), type: 'deletePersonalDebt', payload: { item, index: idx, payments }, ts: new Date().toISOString() };
+        return {
+          personalDebts: s.personalDebts.filter((debt) => debt.id !== id),
+          personalDebtPayments: s.personalDebtPayments.filter((payment) => payment.debtId !== id),
+          undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20),
+        };
+      }),
+      logPersonalDebtPayment: (debtId, amount, note) => set((s) => {
+        const debt = s.personalDebts.find((item) => item.id === debtId);
+        if (!debt) return s;
+        const remaining = Math.max(0, debt.amount - debt.paidAmount);
+        const paymentAmount = Math.min(remaining, Math.max(0, amount));
+        if (paymentAmount <= 0) return s;
+        const date = new Date().toISOString().split('T')[0];
+        const payment: PersonalDebtPayment = {
+          id: uid(),
+          debtId,
+          amount: paymentAmount,
+          date,
+          note,
+        };
+        const personalDebts = s.personalDebts.map((item) => {
+          if (item.id !== debtId) return item;
+          return normalizePersonalDebt({
+            ...item,
+            paidAmount: item.paidAmount + paymentAmount,
+            updatedAt: date,
+          });
+        });
+        return {
+          personalDebts,
+          personalDebtPayments: [payment, ...s.personalDebtPayments],
+        };
+      }),
+
       addCreditCard: (card) => set((s) => ({ creditCards: [...s.creditCards, { ...card, id: uid() }] })),
       updateCreditCard: (id, data) => set((s) => ({
         creditCards: s.creditCards.map((card) => (card.id === id ? { ...card, ...data } : card)),
@@ -885,6 +984,7 @@ export const useFinanceStore = create<FinanceState>()(
             paidAmount: card.paidAmount + applied,
             currentBalance: Math.max(0, card.currentBalance - applied),
             statementBalance: Math.max(0, card.statementBalance - applied),
+            minimumPayment: Math.max(0, card.minimumPayment - applied),
             rewardsPoints: card.rewardsPoints,
             openedDate: card.openedDate,
             lastPaymentDate: payment.date,
@@ -1058,6 +1158,15 @@ export const useFinanceStore = create<FinanceState>()(
             const loan = entry.payload.item as Loan;
             return { loans: insertAt(s.loans, entry.payload.index ?? 0, loan), undoStack: remaining } as any;
           }
+          case 'deletePersonalDebt': {
+            const debt = entry.payload.item as PersonalDebt;
+            const payments = entry.payload.payments as PersonalDebtPayment[];
+            return {
+              personalDebts: insertAt(s.personalDebts, entry.payload.index ?? 0, debt),
+              personalDebtPayments: [...payments, ...s.personalDebtPayments],
+              undoStack: remaining,
+            } as any;
+          }
           case 'deleteCreditCard': {
             const card = entry.payload.item as CreditCard;
             const activities = entry.payload.activities as CreditCardActivity[];
@@ -1109,6 +1218,8 @@ export const useFinanceStore = create<FinanceState>()(
           categoryColors: s.categoryColors,
           loans: s.loans,
           loanPayments: s.loanPayments,
+          personalDebts: s.personalDebts,
+          personalDebtPayments: s.personalDebtPayments,
           creditCards: s.creditCards,
           creditCardActivities: s.creditCardActivities,
           bills: s.bills,
@@ -1131,6 +1242,8 @@ export const useFinanceStore = create<FinanceState>()(
           categoryColors: (data as FinanceDataState & { categoryColors?: Record<string, string> }).categoryColors ?? {},
           loans: data.loans.map((loan) => normalizeLoan(loan)),
           loanPayments: data.loanPayments,
+          personalDebts: ((data as FinanceDataState & { personalDebts?: PersonalDebt[] }).personalDebts ?? []).map((debt) => normalizePersonalDebt(debt)),
+          personalDebtPayments: (data as FinanceDataState & { personalDebtPayments?: PersonalDebtPayment[] }).personalDebtPayments ?? [],
           creditCards: data.creditCards.map((card) => normalizeCreditCard(card)),
           creditCardActivities: data.creditCardActivities,
           bills: data.bills,
@@ -1169,6 +1282,14 @@ export const useFinanceStore = create<FinanceState>()(
           }, { ...s.categoryColors }),
           loans: mergeById(s.loans, (data.loans ?? []).map((l) => normalizeLoan(l as Partial<typeof l>))),
           loanPayments: mergeById(s.loanPayments, data.loanPayments ?? []),
+          personalDebts: mergeById(
+            s.personalDebts,
+            (((data as FinanceDataState & { personalDebts?: PersonalDebt[] }).personalDebts ?? []).map((debt) => normalizePersonalDebt(debt))),
+          ),
+          personalDebtPayments: mergeById(
+            s.personalDebtPayments,
+            (data as FinanceDataState & { personalDebtPayments?: PersonalDebtPayment[] }).personalDebtPayments ?? [],
+          ),
           creditCards: mergeById(s.creditCards, (data.creditCards ?? []).map((c) => normalizeCreditCard(c as Partial<typeof c>))),
           creditCardActivities: mergeById(s.creditCardActivities, data.creditCardActivities ?? []),
           bills: mergeById(s.bills, (data.bills ?? []).map((b) => normalizeBill(b as Partial<typeof b>))),
@@ -1195,6 +1316,8 @@ export const useFinanceStore = create<FinanceState>()(
           budgets: state.budgets ?? [],
           categoryColors: state.categoryColors ?? {},
           loans: state.loans?.map((loan) => normalizeLoan(loan)) ?? [],
+          personalDebts: state.personalDebts?.map((debt) => normalizePersonalDebt(debt)) ?? [],
+          personalDebtPayments: state.personalDebtPayments ?? [],
           bills: state.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
           creditCards: state.creditCards?.map((card) => normalizeCreditCard(card)) ?? [],
         };
@@ -1216,6 +1339,8 @@ export const useFinanceStore = create<FinanceState>()(
           budgets: typedState.budgets ?? currentState.budgets,
           categoryColors: typedState.categoryColors ?? currentState.categoryColors,
           loans: typedState.loans?.map((loan) => normalizeLoan(loan)) ?? currentState.loans,
+          personalDebts: typedState.personalDebts?.map((debt) => normalizePersonalDebt(debt)) ?? currentState.personalDebts,
+          personalDebtPayments: typedState.personalDebtPayments ?? currentState.personalDebtPayments,
           bills: typedState.bills.map((bill) => normalizeBill(bill as Partial<Bill> & { dueDay?: unknown })),
           creditCards: typedState.creditCards?.map((card) => normalizeCreditCard(card)) ?? currentState.creditCards,
         };

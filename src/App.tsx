@@ -11,6 +11,7 @@ import { useFinanceStore } from "@/store/financeStore";
 import Dashboard from "./pages/Dashboard";
 import AccountsPage from "./pages/AccountsPage";
 import LoansPage from "./pages/LoansPage";
+import DebtsPage from "./pages/DebtsPage";
 import CreditsPage from "./pages/CreditsPage";
 import BillsPage from "./pages/BillsPage";
 import BudgetPage from "./pages/BudgetPage";
@@ -117,6 +118,7 @@ const App = () => (
                       <Route path="/" element={<HomeRoute />} />
                       <Route path="/accounts" element={<AccountsPage />} />
                       <Route path="/loans" element={<LoansPage />} />
+                      <Route path="/debts" element={<DebtsPage />} />
                       <Route path="/credits" element={<CreditsPage />} />
                       <Route path="/bills" element={<BillsPage />} />
                       <Route path="/budget" element={<BudgetPage />} />

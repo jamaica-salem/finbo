@@ -14,7 +14,8 @@ import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { buildTransactionCategoryOptions, getCategoryColor } from '@/lib/transactionCategories';
 import type { AccountType, RecurringTransactionFrequency } from '@/types/finance';
-const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, cash: Wallet, 'e-wallet': Smartphone };
+const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, 'digital-bank': Building2, cash: Wallet, 'e-wallet': Smartphone };
+const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = { bank: 'Bank', 'digital-bank': 'Digital Bank', cash: 'Cash', 'e-wallet': 'E-Wallet' };
 const TRANSACTIONS_PER_PAGE = 20;
 
 export default function AccountsPage() {
@@ -150,6 +151,7 @@ export default function AccountsPage() {
     }
     addAccount({ name: aName.trim(), type: aType, balance, currency, color: 'hsl(172, 66%, 40%)' });
     setAName('');
+    setAType('bank');
     setABal('0');
     setAddAccountErrors({});
     setShowAddAccount(false);
@@ -617,7 +619,7 @@ export default function AccountsPage() {
               }}
             >
             <DialogTrigger asChild>
-              <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />Account</Button>
+              <Button className="order-3" size="sm"><Plus className="h-4 w-4 mr-1" />Account</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Add Account</DialogTitle></DialogHeader>
@@ -633,8 +635,9 @@ export default function AccountsPage() {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="bank">Bank</SelectItem>
-                      <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                      <SelectItem value="digital-bank">Digital Bank</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -655,7 +658,7 @@ export default function AccountsPage() {
             }}
           >
             <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Transaction</Button>
+              <Button className="order-2" variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />Transaction</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Add Transaction</DialogTitle></DialogHeader>
@@ -759,8 +762,9 @@ export default function AccountsPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="bank">Bank</SelectItem>
-                  <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="e-wallet">E-Wallet</SelectItem>
+                  <SelectItem value="digital-bank">Digital Bank</SelectItem>
+                  <SelectItem value="cash">Cash</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1052,7 +1056,7 @@ export default function AccountsPage() {
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground">{a.name}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{a.type}</p>
+                    <p className="text-xs text-muted-foreground">{ACCOUNT_TYPE_LABELS[a.type]}</p>
                   </div>
                 </div>
                 <div className="flex gap-1">

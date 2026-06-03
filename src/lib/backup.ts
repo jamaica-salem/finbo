@@ -18,8 +18,11 @@ export const buildFinanceBackupSnapshot = (data: FinanceDataState): FinanceBacku
   data: {
     accounts: [...toArray<Account>(data.accounts)],
     transactions: [...toArray<Transaction>(data.transactions)],
+    recurringTransactionRules: [...toArray(data.recurringTransactionRules)],
     loans: [...toArray(data.loans)],
     loanPayments: [...toArray(data.loanPayments)],
+    personalDebts: [...toArray(data.personalDebts)],
+    personalDebtPayments: [...toArray(data.personalDebtPayments)],
     creditCards: [...toArray(data.creditCards)],
     creditCardActivities: [...toArray(data.creditCardActivities)],
     categoryRules: [...toArray((data as FinanceDataState & { categoryRules?: unknown }).categoryRules)],
@@ -61,8 +64,13 @@ export const normalizeFinanceBackupSnapshot = (value: unknown): FinanceBackupSna
     data: {
       accounts: data.accounts as Account[],
       transactions: data.transactions as Transaction[],
+      recurringTransactionRules: Array.isArray(data.recurringTransactionRules)
+        ? (data.recurringTransactionRules as FinanceDataState['recurringTransactionRules'])
+        : [],
       loans: data.loans as FinanceDataState['loans'],
       loanPayments: data.loanPayments as FinanceDataState['loanPayments'],
+      personalDebts: Array.isArray(data.personalDebts) ? (data.personalDebts as FinanceDataState['personalDebts']) : [],
+      personalDebtPayments: Array.isArray(data.personalDebtPayments) ? (data.personalDebtPayments as FinanceDataState['personalDebtPayments']) : [],
       creditCards: data.creditCards as FinanceDataState['creditCards'],
       creditCardActivities: data.creditCardActivities as FinanceDataState['creditCardActivities'],
       categoryRules: (data as FinanceDataState & { categoryRules?: CategoryRule[] }).categoryRules ?? [],
@@ -133,6 +141,8 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
   const budgets = Array.isArray(data.budgets) ? data.budgets : [];
   const loans = Array.isArray(data.loans) ? data.loans : [];
   const loanPayments = Array.isArray(data.loanPayments) ? data.loanPayments : [];
+  const personalDebts = Array.isArray(data.personalDebts) ? data.personalDebts : [];
+  const personalDebtPayments = Array.isArray(data.personalDebtPayments) ? data.personalDebtPayments : [];
   const creditCards = Array.isArray(data.creditCards) ? data.creditCards : [];
   const creditCardActivities = Array.isArray(data.creditCardActivities) ? data.creditCardActivities : [];
   const bills = Array.isArray(data.bills) ? data.bills : [];
@@ -246,6 +256,33 @@ export const exportFinanceCsv = (data: FinanceDataState) => {
       loanPayments.map((payment) => [
         payment.id,
         payment.loanId,
+        String(payment.amount),
+        payment.date,
+        payment.note ?? '',
+      ]),
+    ),
+    serializeCsvTable(
+      'Personal Debts',
+      ['id', 'personName', 'direction', 'amount', 'paidAmount', 'dueDate', 'note', 'createdAt', 'updatedAt', 'status'],
+      personalDebts.map((debt) => [
+        debt.id,
+        debt.personName,
+        debt.direction,
+        String(debt.amount),
+        String(debt.paidAmount),
+        debt.dueDate ?? '',
+        debt.note ?? '',
+        debt.createdAt,
+        debt.updatedAt,
+        debt.status,
+      ]),
+    ),
+    serializeCsvTable(
+      'Personal Debt Payments',
+      ['id', 'debtId', 'amount', 'date', 'note'],
+      personalDebtPayments.map((payment) => [
+        payment.id,
+        payment.debtId,
         String(payment.amount),
         payment.date,
         payment.note ?? '',
