@@ -13,7 +13,7 @@ import { Progress } from '@/components/ui/progress';
 import { PageHeader } from '@/components/PageHeader';
 import { Plus, Trash2, CreditCard, Pencil, PhilippinePeso, TrendingDown, CalendarClock, Percent } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { deriveLoanMonthlyInterestRate, getLoanNextDueAmount, getLoanNextDueDate, getLoanTotalWithInterest } from '@/lib/interest';
+import { applyLoanPaymentToSchedule, deriveLoanMonthlyInterestRate, getLoanNextDueAmount, getLoanNextDueDate, getLoanTotalWithInterest } from '@/lib/interest';
 import { toast } from 'sonner';
 
 type LoanScheduleFormRow = {
@@ -60,6 +60,11 @@ const getScheduleMetadata = (rows: LoanScheduleFormRow[]) => {
     dueDay,
     monthlyPayment,
   };
+};
+
+const applyPaidAmountToScheduleRows = (rows: LoanScheduleFormRow[], paidAmount: number) => {
+  const resetSchedule = normalizeScheduleRows(rows).map((row) => ({ ...row, paidAmount: 0 }));
+  return applyLoanPaymentToSchedule(resetSchedule, Math.max(0, paidAmount || 0)).schedule;
 };
 
 const parseDateInput = (value: string) => {
@@ -263,13 +268,14 @@ export default function LoansPage() {
     const paidAmount = paidMode === 'months'
       ? addPaidMonthsSummary.paidAmount
       : parseFloat(paid) || 0;
+    const repaymentSchedule = applyPaidAmountToScheduleRows(addSourceRows, paidAmount);
     const monthlyInterestRate = deriveLoanMonthlyInterestRate({
       totalAmount: parseFloat(total) || 0,
       monthlyPayment: scheduleMetadata.monthlyPayment,
       startDate: scheduleMetadata.startDate,
       endDate: scheduleMetadata.endDate,
       dueDay: scheduleMetadata.dueDay,
-      repaymentSchedule: scheduleMetadata.repaymentSchedule,
+      repaymentSchedule,
     });
     addLoan({
       name,
@@ -280,7 +286,7 @@ export default function LoansPage() {
       startDate: scheduleMetadata.startDate,
       dueDay: scheduleMetadata.dueDay,
       endDate: scheduleMetadata.endDate,
-      repaymentSchedule: scheduleMetadata.repaymentSchedule,
+      repaymentSchedule,
       type: loanType,
     });
     setName('');
@@ -353,13 +359,14 @@ export default function LoansPage() {
     const paidAmount = editPaidMode === 'months'
       ? editPaidMonthsSummary.paidAmount
       : parseFloat(editPaid) || 0;
+    const repaymentSchedule = applyPaidAmountToScheduleRows(editSourceRows, paidAmount);
     const monthlyInterestRate = deriveLoanMonthlyInterestRate({
       totalAmount: parseFloat(editTotal) || 0,
       monthlyPayment: scheduleMetadata.monthlyPayment,
       startDate: scheduleMetadata.startDate,
       endDate: scheduleMetadata.endDate,
       dueDay: scheduleMetadata.dueDay,
-      repaymentSchedule: scheduleMetadata.repaymentSchedule,
+      repaymentSchedule,
     });
     updateLoan(editId, {
       name: editName,
@@ -370,7 +377,7 @@ export default function LoansPage() {
       startDate: scheduleMetadata.startDate,
       dueDay: scheduleMetadata.dueDay,
       endDate: scheduleMetadata.endDate,
-      repaymentSchedule: scheduleMetadata.repaymentSchedule,
+      repaymentSchedule,
       type: editType,
     });
     setEditId(null);
