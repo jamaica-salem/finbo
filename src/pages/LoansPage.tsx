@@ -421,16 +421,18 @@ export default function LoansPage() {
     setPendingDelete(null);
   };
 
-  const activeLoans = loans.filter((l) => l.type === 'loan');
-  const installments = loans.filter((l) => l.type === 'installment');
+  const isLoanActive = (loan: (typeof loans)[number]) => getLoanTotalWithInterest(loan) - loan.paidAmount > 0.01;
+  const activeLoanItems = loans.filter(isLoanActive);
+  const activeLoans = activeLoanItems.filter((l) => l.type === 'loan');
+  const installments = activeLoanItems.filter((l) => l.type === 'installment');
   const getLoanProgressPct = (loan: (typeof loans)[number]) => {
     const totalWithInterest = getLoanTotalWithInterest(loan);
     return totalWithInterest > 0 ? Math.min(100, Math.round((loan.paidAmount / totalWithInterest) * 100)) : 0;
   };
-  const totalOutstanding = loans.reduce((sum, loan) => sum + Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount), 0);
-  const totalMonthly = loans.reduce((sum, loan) => sum + loan.monthlyPayment, 0);
-  const averageInterest = loans.length > 0 ? loans.reduce((sum, loan) => sum + loan.monthlyInterestRate, 0) / loans.length : 0;
-  const totalLoanCount = loans.length;
+  const totalOutstanding = activeLoanItems.reduce((sum, loan) => sum + Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount), 0);
+  const totalMonthly = activeLoanItems.reduce((sum, loan) => sum + loan.monthlyPayment, 0);
+  const averageInterest = activeLoanItems.length > 0 ? activeLoanItems.reduce((sum, loan) => sum + loan.monthlyInterestRate, 0) / activeLoanItems.length : 0;
+  const totalLoanCount = activeLoanItems.length;
   const addScheduleMetadata = getScheduleMetadata(addSourceRows);
   const editScheduleMetadata = getScheduleMetadata(editSourceRows);
   const addMonthlyInterestRate = deriveLoanMonthlyInterestRate({
@@ -934,9 +936,9 @@ export default function LoansPage() {
         </div>
       )}
 
-      {loans.length === 0 && (
+      {activeLoanItems.length === 0 && (
         <div className="glass-card rounded-xl p-12 text-center">
-          <p className="text-muted-foreground">No loans or installments yet. Add one to start tracking.</p>
+          <p className="text-muted-foreground">No active loans or installments. Add one to start tracking.</p>
         </div>
       )}
     </div>
