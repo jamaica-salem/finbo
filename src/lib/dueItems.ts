@@ -21,10 +21,10 @@ export interface DueItem {
 }
 
 export interface DueItemPaymentActions {
-  logCreditCardPayment: (cardId: string, amount: number, note?: string) => void;
-  logLoanPayment: (loanId: string, amount: number, note?: string) => void;
-  logPersonalDebtPayment: (debtId: string, amount: number, note?: string) => void;
-  markBillPaid: (billId: string, paidDate?: string) => void;
+  logCreditCardPayment: (cardId: string, amount: number, note?: string, accountId?: string) => void;
+  logLoanPayment: (loanId: string, amount: number, note?: string, accountId?: string) => void;
+  logPersonalDebtPayment: (debtId: string, amount: number, note?: string, accountId?: string) => void;
+  markBillPaid: (billId: string, paidDate?: string, accountId?: string) => void;
 }
 
 export const DUE_ITEM_BADGE_LABELS: Record<DueItemSource, string> = {
@@ -59,21 +59,22 @@ export const settleDueItem = (
   item: DueItem,
   actions: DueItemPaymentActions,
   note = 'Marked paid from Bills and Due Dates',
+  accountId?: string,
 ) => {
   switch (item.sourceType) {
     case 'bill':
-      actions.markBillPaid(item.sourceId);
+      actions.markBillPaid(item.sourceId, undefined, accountId);
       return true;
     case 'loan':
     case 'installment':
-      actions.logLoanPayment(item.sourceId, item.amount, note);
+      actions.logLoanPayment(item.sourceId, item.amount, note, accountId);
       return true;
     case 'credit-card':
-      actions.logCreditCardPayment(item.sourceId, item.amount, note);
+      actions.logCreditCardPayment(item.sourceId, item.amount, note, accountId);
       return true;
     case 'debt-i-owe':
     case 'debt-owed-to-me':
-      actions.logPersonalDebtPayment(item.sourceId, item.amount, note);
+      actions.logPersonalDebtPayment(item.sourceId, item.amount, note, accountId);
       return true;
     default:
       return false;

@@ -31,6 +31,7 @@ const getRemaining = (debt: PersonalDebt) => Math.max(0, debt.amount - debt.paid
 
 export default function DebtsPage() {
   const {
+    accounts,
     personalDebts,
     personalDebtPayments,
     addPersonalDebt,
@@ -60,6 +61,7 @@ export default function DebtsPage() {
 
   const [paymentDebtId, setPaymentDebtId] = useState<string | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('0');
+  const [paymentAccountId, setPaymentAccountId] = useState(accounts[0]?.id ?? '');
   const [paymentNote, setPaymentNote] = useState('');
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<{ id: string; label: string } | null>(null);
@@ -150,6 +152,11 @@ export default function DebtsPage() {
     if (!debt) return;
     const requested = Math.abs(parseFloat(paymentAmount) || 0);
     const remaining = getRemaining(debt);
+    if (!paymentAccountId) {
+      setPaymentError('Choose the account for this payment');
+      toast.error('Choose a payment account');
+      return;
+    }
     if (requested <= 0) {
       setPaymentError('Enter an amount greater than 0');
       toast.error('Invalid payment amount');
@@ -161,9 +168,10 @@ export default function DebtsPage() {
       return;
     }
 
-    logPersonalDebtPayment(paymentDebtId, Math.min(requested, remaining), paymentNote.trim() || undefined);
+    logPersonalDebtPayment(paymentDebtId, Math.min(requested, remaining), paymentNote.trim() || undefined, paymentAccountId);
     setPaymentDebtId(null);
     setPaymentAmount('0');
+    setPaymentAccountId(accounts[0]?.id ?? '');
     setPaymentNote('');
     setPaymentError(null);
     toast.success('Payment recorded');
@@ -335,6 +343,17 @@ export default function DebtsPage() {
               <Label>Payment amount</Label>
               <Input type="number" placeholder="0.00" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} />
               {paymentError ? <p className="text-sm text-destructive">{paymentError}</p> : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>{paymentDebt?.direction === 'owedToMe' ? 'Received into' : 'Paid from'}</Label>
+              <Select value={paymentAccountId} onValueChange={setPaymentAccountId} disabled={!accounts.length}>
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label>Note</Label>

@@ -137,6 +137,44 @@ const getTransactionAccountEffects = (transaction: Transaction) => {
   return effects;
 };
 
+const applyAccountEffects = (accounts: Account[], transaction: Transaction) => {
+  const accountEffects = getTransactionAccountEffects(transaction);
+  return accounts.map((account) => {
+    const delta = accountEffects.get(account.id);
+    return typeof delta === 'number' && delta !== 0
+      ? { ...account, balance: account.balance + delta }
+      : account;
+  });
+};
+
+const buildPaymentTransaction = ({
+  accountId,
+  amount,
+  category,
+  description,
+  date,
+  type = 'expense',
+}: {
+  accountId?: string;
+  amount: number;
+  category: string;
+  description: string;
+  date: string;
+  type?: Transaction['type'];
+}): Transaction | null => {
+  if (!accountId || amount <= 0) return null;
+  return {
+    id: uid(),
+    accountId,
+    type,
+    amount,
+    category,
+    categories: [category],
+    description,
+    date,
+  };
+};
+
 const nextRecurringDate = (date: Date, frequency: RecurringTransactionFrequency, intervalDays?: number) => {
   switch (frequency) {
     case 'daily':
@@ -386,26 +424,26 @@ interface FinanceState {
   addLoan: (loan: Omit<Loan, 'id'>) => void;
   updateLoan: (id: string, data: Partial<Loan>) => void;
   deleteLoan: (id: string) => void;
-  logLoanPayment: (loanId: string, amount: number, note?: string) => void;
+  logLoanPayment: (loanId: string, amount: number, note?: string, accountId?: string) => void;
 
   // Personal debt actions
   addPersonalDebt: (debt: Omit<PersonalDebt, 'id' | 'createdAt' | 'updatedAt' | 'status'> & { status?: PersonalDebt['status'] }) => void;
   updatePersonalDebt: (id: string, data: Partial<PersonalDebt>) => void;
   deletePersonalDebt: (id: string) => void;
-  logPersonalDebtPayment: (debtId: string, amount: number, note?: string) => void;
+  logPersonalDebtPayment: (debtId: string, amount: number, note?: string, accountId?: string) => void;
 
   // Credit card actions
   addCreditCard: (card: Omit<CreditCard, 'id'>) => void;
   updateCreditCard: (id: string, data: Partial<CreditCard>) => void;
   deleteCreditCard: (id: string) => void;
-  logCreditCardPayment: (cardId: string, amount: number, note?: string) => void;
+  logCreditCardPayment: (cardId: string, amount: number, note?: string, accountId?: string) => void;
   logCreditCardPurchase: (cardId: string, amount: number, note?: string) => void;
   
   // Bill actions
   addBill: (bill: Omit<Bill, 'id'>) => void;
   updateBill: (id: string, data: Partial<Bill>) => void;
   deleteBill: (id: string) => void;
-  markBillPaid: (id: string, paidDate?: string) => void;
+  markBillPaid: (id: string, paidDate?: string, accountId?: string) => void;
   markBillUnpaid: (id: string) => void;
 
   // Savings goal actions
@@ -874,11 +912,16 @@ export const useFinanceStore = create<FinanceState>()(
         const undoEntry: UndoEntry = { id: uid(), type: 'deleteLoan', payload: { item, index: idx }, ts: new Date().toISOString() };
         return { loans: s.loans.filter((l) => l.id !== id), undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20) };
       }),
-      logLoanPayment: (loanId, amount, note) => set((s) => {
-        const payment: LoanPayment = { id: uid(), loanId, amount, date: new Date().toISOString().split('T')[0], note };
+      logLoanPayment: (loanId, amount, note, accountId) => set((s) => {
+        const loan = s.loans.find((item) => item.id === loanId);
+        if (!loan) return s;
+        const date = new Date().toISOString().split('T')[0];
+        const scheduleResult = applyLoanPaymentToSchedule(loan.repaymentSchedule, amount);
+        const paymentAmount = scheduleResult.appliedAmount;
+        if (paymentAmount <= 0) return s;
+        const payment: LoanPayment = { id: uid(), loanId, amount: paymentAmount, date, note };
         const loans = s.loans.map((loan) => {
           if (loan.id !== loanId) return loan;
-          const scheduleResult = applyLoanPaymentToSchedule(loan.repaymentSchedule, amount);
           const paidAmount = Math.min(getLoanTotalWithInterest(loan), loan.paidAmount + scheduleResult.appliedAmount);
           return {
             ...loan,
@@ -886,7 +929,19 @@ export const useFinanceStore = create<FinanceState>()(
             repaymentSchedule: scheduleResult.schedule,
           };
         });
-        return { loanPayments: [...s.loanPayments, payment], loans };
+        const transaction = buildPaymentTransaction({
+          accountId,
+          amount: paymentAmount,
+          category: 'Loan Payment',
+          description: `Payment for ${loan.name}`,
+          date,
+        });
+        return {
+          accounts: transaction ? applyAccountEffects(s.accounts, transaction) : s.accounts,
+          transactions: transaction ? [transaction, ...s.transactions] : s.transactions,
+          loanPayments: [payment, ...s.loanPayments],
+          loans,
+        };
       }),
 
       addPersonalDebt: (debt) => set((s) => {
@@ -922,7 +977,7 @@ export const useFinanceStore = create<FinanceState>()(
           undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20),
         };
       }),
-      logPersonalDebtPayment: (debtId, amount, note) => set((s) => {
+      logPersonalDebtPayment: (debtId, amount, note, accountId) => set((s) => {
         const debt = s.personalDebts.find((item) => item.id === debtId);
         if (!debt) return s;
         const remaining = Math.max(0, debt.amount - debt.paidAmount);
@@ -944,7 +999,17 @@ export const useFinanceStore = create<FinanceState>()(
             updatedAt: date,
           });
         });
+        const transaction = buildPaymentTransaction({
+          accountId,
+          amount: paymentAmount,
+          category: debt.direction === 'iOwe' ? 'Debt Payment' : 'Debt Collection',
+          description: debt.direction === 'iOwe' ? `Payment to ${debt.personName}` : `Payment from ${debt.personName}`,
+          date,
+          type: debt.direction === 'iOwe' ? 'expense' : 'income',
+        });
         return {
+          accounts: transaction ? applyAccountEffects(s.accounts, transaction) : s.accounts,
+          transactions: transaction ? [transaction, ...s.transactions] : s.transactions,
           personalDebts,
           personalDebtPayments: [payment, ...s.personalDebtPayments],
         };
@@ -966,7 +1031,7 @@ export const useFinanceStore = create<FinanceState>()(
           undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20),
         };
       }),
-      logCreditCardPayment: (cardId, amount, note) => set((s) => {
+      logCreditCardPayment: (cardId, amount, note, accountId) => set((s) => {
         const paymentAmount = Math.max(0, amount);
         const payment: CreditCardActivity = {
           id: uid(),
@@ -990,7 +1055,20 @@ export const useFinanceStore = create<FinanceState>()(
             lastPaymentDate: payment.date,
           };
         });
-        return { creditCards, creditCardActivities: [payment, ...s.creditCardActivities] };
+        const card = s.creditCards.find((item) => item.id === cardId);
+        const transaction = buildPaymentTransaction({
+          accountId,
+          amount: paymentAmount,
+          category: 'Credit Card Payment',
+          description: `Payment for ${card?.name ?? 'credit card'}`,
+          date: payment.date,
+        });
+        return {
+          accounts: transaction ? applyAccountEffects(s.accounts, transaction) : s.accounts,
+          transactions: transaction ? [transaction, ...s.transactions] : s.transactions,
+          creditCards,
+          creditCardActivities: [payment, ...s.creditCardActivities],
+        };
       }),
       logCreditCardPurchase: (cardId, amount, note) => set((s) => {
         const purchaseAmount = Math.max(0, amount);
@@ -1023,8 +1101,9 @@ export const useFinanceStore = create<FinanceState>()(
         const undoEntry: UndoEntry = { id: uid(), type: 'deleteBill', payload: { item, index: idx }, ts: new Date().toISOString() };
         return { bills: s.bills.filter((b) => b.id !== id), undoStack: [undoEntry, ...(s.undoStack ?? [])].slice(0, 20) };
       }),
-      markBillPaid: (id, paidDateArg) => set((s) => {
+      markBillPaid: (id, paidDateArg, accountId) => set((s) => {
         const paidDate = typeof paidDateArg === 'string' && isIsoDate(paidDateArg) ? paidDateArg : new Date().toISOString().split('T')[0];
+        const billToPay = s.bills.find((bill) => bill.id === id);
         const bills = s.bills.map((bill) => {
           if (bill.id !== id) return bill;
 
@@ -1058,8 +1137,21 @@ export const useFinanceStore = create<FinanceState>()(
             paidDate,
           };
         });
+        const transaction = billToPay
+          ? buildPaymentTransaction({
+              accountId,
+              amount: Math.max(0, billToPay.amount),
+              category: billToPay.category || 'Bills',
+              description: `Payment for ${billToPay.name}`,
+              date: paidDate,
+            })
+          : null;
 
-        return { bills };
+        return {
+          accounts: transaction ? applyAccountEffects(s.accounts, transaction) : s.accounts,
+          transactions: transaction ? [transaction, ...s.transactions] : s.transactions,
+          bills,
+        };
       }),
       markBillUnpaid: (id) => set((s) => ({
         bills: s.bills.map((b) => b.id === id ? { ...b, status: 'pending' as const, paidDate: undefined } : b),

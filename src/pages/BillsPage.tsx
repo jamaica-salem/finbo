@@ -30,6 +30,7 @@ const formatMonthLabel = (value: string) => {
 
 export default function BillsPage() {
   const {
+    accounts,
     bills,
     loans,
     creditCards,
@@ -68,6 +69,7 @@ export default function BillsPage() {
   const [addErrors, setAddErrors] = useState<{ name?: string; amount?: string; dueDate?: string; intervalDays?: string }>({});
   const [editErrors, setEditErrors] = useState<{ name?: string; amount?: string; dueDate?: string; intervalDays?: string }>({});
   const [pendingDelete, setPendingDelete] = useState<{ type: 'bill' | 'recurring'; id: string; label: string } | null>(null);
+  const [duePaymentAccountId, setDuePaymentAccountId] = useState(accounts[0]?.id ?? '');
 
   const billCategories = useMemo(
     () => buildTransactionCategoryOptions(transactions, transactionCategories, sharedCategories),
@@ -207,12 +209,16 @@ export default function BillsPage() {
   };
 
   const handleMarkDueItemPaid = (item: DueItem) => {
+    if (!duePaymentAccountId) {
+      toast.error('Choose a payment account');
+      return;
+    }
     const handled = settleDueItem(item, {
       markBillPaid,
       logLoanPayment,
       logCreditCardPayment,
       logPersonalDebtPayment,
-    });
+    }, undefined, duePaymentAccountId);
     if (!handled) return;
 
     if (item.sourceType === 'bill') {
@@ -540,6 +546,18 @@ export default function BillsPage() {
 
       {monthGroups.length > 0 ? (
         <div className="space-y-6">
+          <div className="flex justify-end">
+            <div className="w-full sm:w-56">
+              <Select value={duePaymentAccountId} onValueChange={setDuePaymentAccountId} disabled={!accounts.length}>
+                <SelectTrigger><SelectValue placeholder="Pay from account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           {monthGroups.map(([monthKey, monthItems]) => {
             const heading = monthKey === 'no-due-date' ? 'No Due Date' : formatMonthLabel(monthItems[0].dueDate);
 

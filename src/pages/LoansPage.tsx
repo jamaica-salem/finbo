@@ -195,13 +195,14 @@ const buildEqualMonthlyRows = (
 };
 
 export default function LoansPage() {
-  const { loans, addLoan, updateLoan, deleteLoan, logLoanPayment, currency } = useFinanceStore();
+  const { accounts, loans, addLoan, updateLoan, deleteLoan, logLoanPayment, currency } = useFinanceStore();
   const [showAdd, setShowAdd] = useState(false);
   const [payLoanId, setPayLoanId] = useState<string | null>(null);
   const [payMode, setPayMode] = useState<PaidProgressMode>('amount');
   const [payAmount, setPayAmount] = useState('0');
   const [payMonths, setPayMonths] = useState('1');
   const [payNote, setPayNote] = useState('');
+  const [payAccountId, setPayAccountId] = useState(accounts[0]?.id ?? '');
 
   // Add form
   const [name, setName] = useState('');
@@ -389,6 +390,11 @@ export default function LoansPage() {
     if (!payLoanId) return;
     const loan = loans.find((item) => item.id === payLoanId);
     if (!loan) return;
+    if (!payAccountId) {
+      setPayError('Choose the account used to pay');
+      toast.error('Choose a payment account');
+      return;
+    }
     const remaining = Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount);
     const requested = payMode === 'months'
       ? payMonthsSummary.paymentAmount
@@ -404,7 +410,7 @@ export default function LoansPage() {
       toast.error('Payment must be greater than remaining balance');
       return;
     }
-    logLoanPayment(payLoanId, paymentAmount, payNote || undefined);
+    logLoanPayment(payLoanId, paymentAmount, payNote || undefined, payAccountId);
     setPayMode('amount'); setPayAmount('0'); setPayMonths('1'); setPayNote(''); setPayLoanId(null);
     toast('Payment logged');
   };
@@ -776,6 +782,7 @@ export default function LoansPage() {
         setPayAmount('0');
         setPayMonths('1');
         setPayNote('');
+        setPayAccountId(accounts[0]?.id ?? '');
         setPayError(null);
       }}>
         <DialogContent>
@@ -788,6 +795,17 @@ export default function LoansPage() {
                 <SelectContent>
                   <SelectItem value="amount">Payment amount</SelectItem>
                   <SelectItem value="months">Paid months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Paid from</Label>
+              <Select value={payAccountId} onValueChange={setPayAccountId} disabled={!accounts.length}>
+                <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -115,6 +115,41 @@ describe('finance store - core flows', () => {
     expect(st().loanPayments.length).toBe(1);
   });
 
+  it('records payment transactions against selected accounts', () => {
+    const st = () => useFinanceStore.getState();
+    st().addAccount({ name: 'Wallet', type: 'cash', balance: 1000, currency: '₱', color: '#000' });
+    const account = st().accounts[0];
+
+    st().addLoan({
+      name: 'Loan',
+      totalAmount: 100,
+      paidAmount: 0,
+      monthlyPayment: 100,
+      monthlyInterestRate: 0,
+      startDate: todayKey(),
+      dueDay: 1,
+      endDate: todayKey(),
+      repaymentSchedule: [{ id: 'loan-row', dueDate: todayKey(), amount: 100, paidAmount: 0 }],
+      type: 'loan',
+    });
+    const loan = st().loans[0];
+    st().logLoanPayment(loan.id, 40, 'loan payment', account.id);
+    expect(st().accounts[0].balance).toBe(960);
+    expect(st().transactions[0].category).toBe('Loan Payment');
+
+    st().addBill({ name: 'Internet', amount: 120, category: 'Utilities', dueDate: todayKey(), recurring: false, status: 'pending' });
+    const bill = st().bills[0];
+    st().markBillPaid(bill.id, todayKey(), account.id);
+    expect(st().accounts[0].balance).toBe(840);
+    expect(st().transactions[0].description).toBe('Payment for Internet');
+
+    st().addPersonalDebt({ personName: 'Ana', direction: 'iOwe', amount: 200, paidAmount: 0, dueDate: todayKey() });
+    const debt = st().personalDebts[0];
+    st().logPersonalDebtPayment(debt.id, 50, 'debt payment', account.id);
+    expect(st().accounts[0].balance).toBe(790);
+    expect(st().transactions[0].category).toBe('Debt Payment');
+  });
+
   it('replaceFinanceData restores snapshot', () => {
     const st = () => useFinanceStore.getState();
     const snapshot = {

@@ -153,8 +153,10 @@ export default function Dashboard() {
   const [lpCardId, setLpCardId] = useState(creditCards[0]?.id ?? '');
   const [lpBillId, setLpBillId] = useState(bills[0]?.id ?? '');
   const [lpAmount, setLpAmount] = useState('0');
+  const [lpAccountId, setLpAccountId] = useState(accounts[0]?.id ?? '');
   const [lpNote, setLpNote] = useState('');
   const [lpBillDate, setLpBillDate] = useState(new Date().toISOString().slice(0, 10));
+  const [duePaymentAccountId, setDuePaymentAccountId] = useState(accounts[0]?.id ?? '');
 
   const categoryOptions = useMemo(
     () => buildTransactionCategoryOptions(transactions, transactionCategories, sharedCategories),
@@ -242,13 +244,17 @@ export default function Dashboard() {
 
   const handleLogPaymentQuick = () => {
     const amount = Math.abs(parseFloat(lpAmount) || 0);
+    if (!lpAccountId) {
+      toast.error('Choose a payment account');
+      return;
+    }
 
     if (lpType === 'loan') {
       if (!lpLoanId || amount <= 0) {
         toast.error('Select a loan and enter a valid amount');
         return;
       }
-      logLoanPayment(lpLoanId, amount, lpNote || undefined);
+      logLoanPayment(lpLoanId, amount, lpNote || undefined, lpAccountId);
       toast.success('Loan payment logged');
     }
 
@@ -257,7 +263,7 @@ export default function Dashboard() {
         toast.error('Select a card and enter a valid amount');
         return;
       }
-      logCreditCardPayment(lpCardId, amount, lpNote || undefined);
+      logCreditCardPayment(lpCardId, amount, lpNote || undefined, lpAccountId);
       toast.success('Credit card payment logged');
     }
 
@@ -266,7 +272,7 @@ export default function Dashboard() {
         toast.error('Select a bill');
         return;
       }
-      markBillPaid(lpBillId, lpBillDate);
+      markBillPaid(lpBillId, lpBillDate, lpAccountId);
       toast.success('Bill payment logged');
     }
 
@@ -276,12 +282,16 @@ export default function Dashboard() {
   };
 
   const handleMarkDueItemPaid = (item: DueItem) => {
+    if (!duePaymentAccountId) {
+      toast.error('Choose a payment account');
+      return;
+    }
     const handled = settleDueItem(item, {
       markBillPaid,
       logLoanPayment,
       logCreditCardPayment,
       logPersonalDebtPayment,
-    });
+    }, undefined, duePaymentAccountId);
     if (!handled) return;
 
     if (item.sourceType === 'bill') {
@@ -566,6 +576,17 @@ export default function Dashboard() {
                       </SelectContent>
                     </Select>
                   </div>
+                  <div className="space-y-1.5">
+                    <Label>Paid from</Label>
+                    <Select value={lpAccountId} onValueChange={setLpAccountId} disabled={!accounts.length}>
+                      <SelectTrigger><SelectValue placeholder="Select account" /></SelectTrigger>
+                      <SelectContent>
+                        {accounts.map((account) => (
+                          <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   {lpType === 'loan' ? (
                     <>
@@ -764,7 +785,19 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="glass-card rounded-xl p-5">
-          <h3 className="mb-4 font-heading font-semibold text-foreground">Upcoming Bills and Due Dates</h3>
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="font-heading font-semibold text-foreground">Upcoming Bills and Due Dates</h3>
+            <div className="w-full sm:w-48">
+              <Select value={duePaymentAccountId} onValueChange={setDuePaymentAccountId} disabled={!accounts.length}>
+                <SelectTrigger><SelectValue placeholder="Pay from account" /></SelectTrigger>
+                <SelectContent>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>{account.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="space-y-3">
             {upcomingDueItems.length === 0 ? (
               <p className="text-sm text-muted-foreground">No upcoming bills or due dates.</p>
