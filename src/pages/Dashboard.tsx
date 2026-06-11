@@ -15,7 +15,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
 import { buildTransactionCategoryOptions, getCategoryColor } from '@/lib/transactionCategories';
-import { getLoanTotalWithInterest } from '@/lib/interest';
+import { getLoanRepaymentSchedule, getLoanTotalWithInterest } from '@/lib/interest';
 import { DUE_ITEM_BADGE_LABELS, getDueItems, settleDueItem, type DueItem } from '@/lib/dueItems';
 
 const formatDueDate = (value: string) => {
@@ -26,6 +26,86 @@ const formatDueDate = (value: string) => {
 
 const getCategories = (transaction: { category: string; categories?: string[] }) =>
   (transaction.categories && transaction.categories.length > 0 ? transaction.categories : [transaction.category]).filter(Boolean);
+
+const parseLocalDate = (value: string) => {
+  if (!value) return null;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const isDateInMonth = (value: string, monthStart: Date) => {
+  const date = parseLocalDate(value);
+  return Boolean(date && date.getFullYear() === monthStart.getFullYear() && date.getMonth() === monthStart.getMonth());
+};
+
+const addRecurringInterval = (date: Date, frequency: string, intervalDays?: number) => {
+  const next = new Date(date);
+
+  if (frequency === 'daily') {
+    next.setDate(next.getDate() + 1);
+    return next;
+  }
+  if (frequency === 'weekly') {
+    next.setDate(next.getDate() + 7);
+    return next;
+  }
+  if (frequency === 'biweekly') {
+    next.setDate(next.getDate() + 14);
+    return next;
+  }
+  if (frequency === 'yearly') {
+    next.setFullYear(next.getFullYear() + 1);
+    return next;
+  }
+  if (frequency === 'custom') {
+    next.setDate(next.getDate() + Math.max(1, intervalDays || 1));
+    return next;
+  }
+
+  next.setMonth(next.getMonth() + 1);
+  return next;
+};
+
+const getRecurringExpenseDueThisMonth = (
+  rules: Array<{
+    active: boolean;
+    type: 'income' | 'expense';
+    amount: number;
+    frequency: string;
+    intervalDays?: number;
+    startDate: string;
+    nextRunDate: string;
+    endDate?: string;
+  }>,
+  monthStart: Date,
+) => {
+  const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+
+  return rules
+    .filter((rule) => rule.active && rule.type === 'expense')
+    .reduce((sum, rule) => {
+      const firstDueDate = parseLocalDate(rule.nextRunDate || rule.startDate);
+      if (!firstDueDate) return sum;
+
+      const endDate = parseLocalDate(rule.endDate || '');
+      let cursor = new Date(firstDueDate);
+      let occurrences = 0;
+      let guard = 0;
+
+      while (cursor < monthStart && guard < 800) {
+        cursor = addRecurringInterval(cursor, rule.frequency, rule.intervalDays);
+        guard += 1;
+      }
+
+      while (cursor <= monthEnd && (!endDate || cursor <= endDate) && guard < 800) {
+        occurrences += 1;
+        cursor = addRecurringInterval(cursor, rule.frequency, rule.intervalDays);
+        guard += 1;
+      }
+
+      return sum + Math.max(0, rule.amount) * occurrences;
+    }, 0);
+};
 
 export default function Dashboard() {
   const {
@@ -240,22 +320,13 @@ export default function Dashboard() {
     previousBalance <= 0 && totalBalance > 0 ? 'New balance this month' : previousBalance === 0 ? 'vs last month' : 'vs last month';
 
   const activeLoans = loans.filter((loan) => loan.paidAmount < getLoanTotalWithInterest(loan));
-  const totalBillsDue = bills.filter((bill) => bill.status !== 'paid').reduce((sum, bill) => sum + bill.amount, 0);
-  const paidBills = bills.filter((bill) => bill.status === 'paid').length;
   const totalLoanRemaining = loans
     .filter((loan) => loan.type === 'loan')
     .reduce((sum, loan) => sum + Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount), 0);
   const totalInstallmentRemaining = loans
     .filter((loan) => loan.type === 'installment')
     .reduce((sum, loan) => sum + Math.max(0, getLoanTotalWithInterest(loan) - loan.paidAmount), 0);
-  const totalLoanMonthlyPayments = loans
-    .filter((loan) => loan.type === 'loan')
-    .reduce((sum, loan) => sum + Math.max(0, loan.monthlyPayment), 0);
-  const totalInstallmentMonthlyPayments = loans
-    .filter((loan) => loan.type === 'installment')
-    .reduce((sum, loan) => sum + Math.max(0, loan.monthlyPayment), 0);
   const totalCreditCardDebt = creditCards.reduce((sum, card) => sum + Math.max(0, card.currentBalance), 0);
-  const totalCreditCardMinimumPayments = creditCards.reduce((sum, card) => sum + Math.max(0, card.minimumPayment), 0);
   const totalPersonalDebtOwed = personalDebts
     .filter((debt) => debt.status !== 'settled' && debt.direction === 'iOwe')
     .reduce((sum, debt) => sum + Math.max(0, debt.amount - debt.paidAmount), 0);
@@ -263,9 +334,24 @@ export default function Dashboard() {
     .filter((debt) => debt.status !== 'settled' && debt.direction === 'owedToMe')
     .reduce((sum, debt) => sum + Math.max(0, debt.amount - debt.paidAmount), 0);
   const activeReceivablesCount = personalDebts.filter((debt) => debt.status !== 'settled' && debt.direction === 'owedToMe').length;
-  const activeMonthlyRecurringExpenses = recurringTransactionRules
-    .filter((rule) => rule.active && rule.type === 'expense' && rule.frequency === 'monthly')
-    .reduce((sum, rule) => sum + Math.max(0, rule.amount), 0);
+  const monthStart = new Date(thisYear, thisMonth, 1);
+  const totalBillsDueThisMonth = bills
+    .filter((bill) => bill.status !== 'paid' && isDateInMonth(bill.dueDate, monthStart))
+    .reduce((sum, bill) => sum + Math.max(0, bill.amount), 0);
+  const totalLoanAndInstallmentDueThisMonth = loans.reduce((sum, loan) => {
+    const scheduleDue = getLoanRepaymentSchedule(loan)
+      .filter((entry) => isDateInMonth(entry.dueDate, monthStart))
+      .reduce((scheduleSum, entry) => scheduleSum + Math.max(0, entry.amount - entry.paidAmount), 0);
+    return sum + scheduleDue;
+  }, 0);
+  const totalCreditCardDueThisMonth = creditCards
+    .filter((card) => isDateInMonth(card.dueDate, monthStart))
+    .reduce((sum, card) => {
+      const paidThisCycle = Boolean(card.lastPaymentDate && card.lastPaymentDate >= card.dueDate);
+      const dueAmount = card.minimumPayment > 0 ? card.minimumPayment : paidThisCycle ? 0 : card.currentBalance;
+      return sum + Math.max(0, dueAmount);
+    }, 0);
+  const totalRecurringExpensesDueThisMonth = getRecurringExpenseDueThisMonth(recurringTransactionRules, monthStart);
 
   const hasFinancialData =
     accounts.length > 0 ||
@@ -276,12 +362,11 @@ export default function Dashboard() {
     creditCards.length > 0 ||
     recurringTransactionRules.length > 0;
 
-  const totalMonthlyPayments =
-    totalBillsDue +
-    totalLoanMonthlyPayments +
-    totalInstallmentMonthlyPayments +
-    totalCreditCardMinimumPayments +
-    activeMonthlyRecurringExpenses;
+  const totalDueThisMonth =
+    totalBillsDueThisMonth +
+    totalLoanAndInstallmentDueThisMonth +
+    totalCreditCardDueThisMonth +
+    totalRecurringExpensesDueThisMonth;
   const totalDebts = totalLoanRemaining + totalInstallmentRemaining + totalCreditCardDebt + totalPersonalDebtOwed;
   const netAfterDebts = totalBalance + totalPersonalDebtReceivable - totalDebts;
   const nearNegativeNetThreshold = hasFinancialData ? Math.max(1000, totalDebts * 0.1) : 0;
@@ -578,9 +663,9 @@ export default function Dashboard() {
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
-          title="Monthly Payments"
-          value={`${currency}${totalMonthlyPayments.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
-          subtitle="Bills + loans + installments + credit cards + recurring expenses"
+          title="Total Due This Month"
+          value={`${currency}${totalDueThisMonth.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          subtitle="Current-month bills + loans + installments + credit cards + recurring expenses"
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
