@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { PhilippinePeso, Receipt, TrendingUp, CreditCard, CalendarClock, Plus, Square } from 'lucide-react';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -17,6 +18,7 @@ import { Progress } from '@/components/ui/progress';
 import { buildTransactionCategoryOptions, getCategoryColor } from '@/lib/transactionCategories';
 import { getLoanRepaymentSchedule, getLoanTotalWithInterest } from '@/lib/interest';
 import { DUE_ITEM_BADGE_LABELS, getDueItems, settleDueItem, type DueItem } from '@/lib/dueItems';
+import { formatMoney } from '@/lib/money';
 
 const formatDueDate = (value: string) => {
   const date = new Date(`${value}T00:00:00`);
@@ -128,6 +130,7 @@ export default function Dashboard() {
     logPersonalDebtPayment,
     markBillPaid,
   } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
 
   const [showAddExpense, setShowAddExpense] = useState(false);
   const [qeAccount, setQeAccount] = useState(accounts[0]?.id ?? '');
@@ -667,7 +670,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Balance"
-          value={`${currency}${totalBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalBalance, amountsHidden, { minimumFractionDigits: 2 })}
           trend={{
             value:
               previousBalance === 0 && totalBalance === 0
@@ -679,19 +682,19 @@ export default function Dashboard() {
         />
         <StatCard
           title="Total Owed To Me"
-          value={`${currency}${totalPersonalDebtReceivable.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalPersonalDebtReceivable, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle={`${activeReceivablesCount} active receivable${activeReceivablesCount === 1 ? '' : 's'}`}
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
           title="Total Due This Month"
-          value={`${currency}${totalDueThisMonth.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalDueThisMonth, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle="Current-month bills + loans + installments + credit cards + recurring expenses"
           icon={<Receipt className="h-5 w-5" />}
         />
         <StatCard
           title="Net"
-          value={`${currency}${netAfterDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, netAfterDebts, amountsHidden, { minimumFractionDigits: 2 })}
           valueClassName={netValueClassName}
           subtitle={netSubtitle}
           className={netCardClassName}
@@ -702,25 +705,25 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Loans"
-          value={`${currency}${totalLoanRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalLoanRemaining, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle={`${totalLoansCount} loan${totalLoansCount === 1 ? '' : 's'}`}
           icon={<CreditCard className="h-5 w-5" />}
         />
         <StatCard
           title="Total Installments"
-          value={`${currency}${totalInstallmentRemaining.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalInstallmentRemaining, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle={`${totalInstallmentsCount} installment${totalInstallmentsCount === 1 ? '' : 's'}`}
           icon={<CalendarClock className="h-5 w-5" />}
         />
         <StatCard
           title="Credit Cards"
-          value={`${currency}${totalCreditCardDebt.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalCreditCardDebt, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle={`${creditCards.length} card${creditCards.length === 1 ? '' : 's'}`}
           icon={<CreditCard className="h-5 w-5" />}
         />
         <StatCard
           title="Total Debts"
-          value={`${currency}${totalDebts.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalDebts, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle="Loans + installments + credit cards + personal debts"
           icon={<CreditCard className="h-5 w-5" />}
         />
@@ -733,7 +736,7 @@ export default function Dashboard() {
             <BarChart data={cashflowData} barCategoryGap="30%">
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 90%)" />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'hsl(220, 10%, 46%)' }} />
-              <YAxis tick={{ fontSize: 12, fill: 'hsl(220, 10%, 46%)' }} />
+              <YAxis tick={{ fontSize: 12, fill: 'hsl(220, 10%, 46%)' }} tickFormatter={(value) => amountsHidden ? '*****' : String(value)} />
               <Tooltip
                 contentStyle={{
                   background: 'hsl(0, 0%, 100%)',
@@ -741,7 +744,7 @@ export default function Dashboard() {
                   borderRadius: '8px',
                   fontSize: '12px',
                 }}
-                formatter={(value: number) => [`${currency}${value.toLocaleString()}`, '']}
+                formatter={(value: number) => [formatMoney(currency, value, amountsHidden, { maximumFractionDigits: 0 }), '']}
               />
               <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
                 <Cell fill="hsl(172, 66%, 40%)" />
@@ -762,7 +765,7 @@ export default function Dashboard() {
                       <Cell key={entry.name} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => [`${currency}${value}`, '']} />
+                  <Tooltip formatter={(value: number) => [formatMoney(currency, value, amountsHidden, { maximumFractionDigits: 0 }), '']} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="flex-1 space-y-2">
@@ -772,7 +775,7 @@ export default function Dashboard() {
                       <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: category.color }} />
                       <span className="text-muted-foreground">{category.name}</span>
                     </div>
-                    <span className="font-medium text-foreground">{currency}{category.value}</span>
+                    <span className="font-medium text-foreground">{formatMoney(currency, category.value, amountsHidden, { maximumFractionDigits: 0 })}</span>
                   </div>
                 ))}
               </div>
@@ -825,7 +828,7 @@ export default function Dashboard() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-foreground">{currency}{item.amount.toFixed(2)}</p>
+                    <p className="text-sm font-semibold text-foreground">{formatMoney(currency, item.amount, amountsHidden)}</p>
                     <span className={cn('text-xs font-medium', item.status === 'overdue' ? 'text-destructive' : 'text-warning')}>
                       {item.status === 'overdue' ? 'Overdue' : 'Pending'}
                     </span>
@@ -854,7 +857,7 @@ export default function Dashboard() {
                     </div>
                     <Progress value={pct} className="h-2" />
                     <p className="text-xs text-muted-foreground">
-                      {currency}{loan.paidAmount.toLocaleString()} / {currency}{totalWithInterest.toLocaleString()}
+                      {formatMoney(currency, loan.paidAmount, amountsHidden, { maximumFractionDigits: 0 })} / {formatMoney(currency, totalWithInterest, amountsHidden, { maximumFractionDigits: 0 })}
                     </p>
                   </div>
                 );

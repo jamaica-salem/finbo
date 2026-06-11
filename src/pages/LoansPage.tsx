@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { format } from 'date-fns';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +16,7 @@ import { Plus, Trash2, CreditCard, Pencil, PhilippinePeso, TrendingDown, Calenda
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { applyLoanPaymentToSchedule, deriveLoanMonthlyInterestRate, getLoanNextDueAmount, getLoanNextDueDate, getLoanTotalWithInterest } from '@/lib/interest';
 import { toast } from 'sonner';
+import { formatMoney } from '@/lib/money';
 
 type LoanScheduleFormRow = {
   id: string;
@@ -196,6 +198,7 @@ const buildEqualMonthlyRows = (
 
 export default function LoansPage() {
   const { accounts, loans, addLoan, updateLoan, deleteLoan, logLoanPayment, currency } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
   const [showAdd, setShowAdd] = useState(false);
   const [payLoanId, setPayLoanId] = useState<string | null>(null);
   const [payMode, setPayMode] = useState<PaidProgressMode>('amount');
@@ -530,8 +533,8 @@ export default function LoansPage() {
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-          <div>Total due: {currency}{totalDue.toLocaleString()}</div>
-          <div>Average payment: {currency}{averageAmount.toLocaleString()}</div>
+          <div>Total due: {formatMoney(currency, totalDue, amountsHidden, { maximumFractionDigits: 0 })}</div>
+          <div>Average payment: {formatMoney(currency, averageAmount, amountsHidden, { maximumFractionDigits: 0 })}</div>
         </div>
       </div>
     );
@@ -567,7 +570,7 @@ export default function LoansPage() {
           <Label>Paid months</Label>
           <Input placeholder="0" type="number" min="0" step="1" value={paidMonthsValue} onChange={(e) => setPaidMonthsValue(e.target.value)} />
           <p className="text-xs text-muted-foreground">
-            Counts fully paid months from the start of the schedule. {summary.safeMonths} of {summary.totalMonths} month{summary.totalMonths === 1 ? '' : 's'} = {currency}{summary.paidAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            Counts fully paid months from the start of the schedule. {summary.safeMonths} of {summary.totalMonths} month{summary.totalMonths === 1 ? '' : 's'} = {formatMoney(currency, summary.paidAmount, amountsHidden)}
           </p>
         </div>
       )}
@@ -581,7 +584,7 @@ export default function LoansPage() {
     const nextDue = getLoanNextDueDate(l);
     const nextDueAmount = getLoanNextDueAmount(l);
     const formattedNextDue = formatMonthDay(nextDue);
-    const formattedNextDueAmount = nextDue ? `${currency}${nextDueAmount.toLocaleString()}` : '—';
+    const formattedNextDueAmount = nextDue ? formatMoney(currency, nextDueAmount, amountsHidden, { maximumFractionDigits: 0 }) : '—';
 
     return (
       <div key={l.id} className="glass-card rounded-xl p-5 animate-fade-in">
@@ -611,14 +614,14 @@ export default function LoansPage() {
           </div>
           <Progress value={pct} className="h-2.5" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{currency}{l.paidAmount.toLocaleString()} paid</span>
-            <span>{currency}{totalWithInterest.toLocaleString()} total with interest</span>
+            <span>{formatMoney(currency, l.paidAmount, amountsHidden, { maximumFractionDigits: 0 })} paid</span>
+            <span>{formatMoney(currency, totalWithInterest, amountsHidden, { maximumFractionDigits: 0 })} total with interest</span>
           </div>
         </div>
         <div className="mt-3 pt-3 border-t border-border grid grid-cols-3 gap-2 text-xs">
           <div>
             <span className="text-muted-foreground">Remaining</span>
-            <p className="font-medium text-foreground">{currency}{remaining.toLocaleString()}</p>
+            <p className="font-medium text-foreground">{formatMoney(currency, remaining, amountsHidden, { maximumFractionDigits: 0 })}</p>
           </div>
           <div className="text-center">
             <span className="text-muted-foreground">Next Amount</span>
@@ -728,8 +731,7 @@ export default function LoansPage() {
                     {addErrors.schedule ? <p className="text-sm text-destructive">{addErrors.schedule}</p> : null}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Generated {addGeneratedRows.length} payment{addGeneratedRows.length === 1 ? '' : 's'} from the loan date at {currency}
-                    {(parseFloat(scheduleMonthlyPayment) || 0).toLocaleString()} each.
+                    Generated {addGeneratedRows.length} payment{addGeneratedRows.length === 1 ? '' : 's'} from the loan date at {formatMoney(currency, parseFloat(scheduleMonthlyPayment) || 0, amountsHidden, { maximumFractionDigits: 0 })} each.
                   </p>
                 </div>
               ) : (
@@ -757,13 +759,13 @@ export default function LoansPage() {
         />
         <StatCard
           title="Outstanding Balance"
-          value={`${currency}${totalOutstanding.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalOutstanding, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle="Across all loans"
           icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
           title="Monthly Commitments"
-          value={`${currency}${totalMonthly.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+          value={formatMoney(currency, totalMonthly, amountsHidden, { minimumFractionDigits: 2 })}
           subtitle="Planned monthly payments"
           icon={<CalendarClock className="h-5 w-5" />}
         />
@@ -820,7 +822,7 @@ export default function LoansPage() {
                 <Label>Paid months</Label>
                 <Input placeholder="1" type="number" min="1" step="1" value={payMonths} onChange={(e) => setPayMonths(e.target.value)} />
                 <p className="text-xs text-muted-foreground">
-                  Applies to the next unpaid months in the schedule. {payMonthsSummary.safeMonths} of {payMonthsSummary.totalMonths} month{payMonthsSummary.totalMonths === 1 ? '' : 's'} = {currency}{payMonthsSummary.paymentAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  Applies to the next unpaid months in the schedule. {payMonthsSummary.safeMonths} of {payMonthsSummary.totalMonths} month{payMonthsSummary.totalMonths === 1 ? '' : 's'} = {formatMoney(currency, payMonthsSummary.paymentAmount, amountsHidden)}
                 </p>
                 {payError ? <p className="text-sm text-destructive">{payError}</p> : null}
               </div>
@@ -907,8 +909,7 @@ export default function LoansPage() {
                   {editErrors.schedule ? <p className="text-sm text-destructive">{editErrors.schedule}</p> : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Generated {editGeneratedRows.length} payment{editGeneratedRows.length === 1 ? '' : 's'} from the loan date at {currency}
-                  {(parseFloat(editScheduleMonthlyPayment) || 0).toLocaleString()} each.
+                  Generated {editGeneratedRows.length} payment{editGeneratedRows.length === 1 ? '' : 's'} from the loan date at {formatMoney(currency, parseFloat(editScheduleMonthlyPayment) || 0, amountsHidden, { maximumFractionDigits: 0 })} each.
                 </p>
               </div>
             ) : (

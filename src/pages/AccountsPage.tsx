@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { buildTransactionCategoryOptions, getCategoryColor } from '@/lib/transactionCategories';
 import type { AccountType, RecurringTransactionFrequency } from '@/types/finance';
+import { formatMoney } from '@/lib/money';
 const ACCOUNT_ICONS: Record<AccountType, React.ElementType> = { bank: Building2, 'digital-bank': Building2, cash: Wallet, 'e-wallet': Smartphone };
 const ACCOUNT_TYPE_LABELS: Record<AccountType, string> = { bank: 'Bank', 'digital-bank': 'Digital Bank', cash: 'Cash', 'e-wallet': 'E-Wallet' };
 const TRANSACTIONS_PER_PAGE = 20;
@@ -37,6 +39,7 @@ export default function AccountsPage() {
     deleteRecurringTransactionRule,
     currency,
   } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [showAddTx, setShowAddTx] = useState(false);
   const [editTxId, setEditTxId] = useState<string | null>(null);
@@ -1170,7 +1173,7 @@ export default function AccountsPage() {
                   </Button>
                 </div>
               </div>
-              <p className="text-xl font-heading font-bold text-foreground mt-3">{currency}{a.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</p>
+              <p className="text-xl font-heading font-bold text-foreground mt-3">{formatMoney(currency, a.balance, amountsHidden, { minimumFractionDigits: 2 })}</p>
             </div>
           );
         })}
@@ -1315,7 +1318,7 @@ export default function AccountsPage() {
                   {tx.recurringRuleId ? <Badge variant="secondary">Recurring</Badge> : null}
                   {tx.type === 'transfer' ? <Badge variant="outline">Transfer</Badge> : null}
                   <p className={cn('text-sm font-semibold', tx.type === 'income' ? 'text-success' : tx.type === 'expense' ? 'text-destructive' : 'text-primary')}>
-                    {tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}{currency}{tx.amount.toFixed(2)}
+                    {amountsHidden ? '*****' : `${tx.type === 'income' ? '+' : tx.type === 'expense' ? '-' : ''}${formatMoney(currency, tx.amount, false)}`}
                   </p>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={() => openEditTransaction(tx.id)}>
                     <Pencil className="h-3 w-3" />

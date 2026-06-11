@@ -1,5 +1,7 @@
 import { useFinanceStore } from '@/store/financeStore';
-import { AlertCircle, Bell, CircleUserRound, Clock } from 'lucide-react';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
+import { formatMoney } from '@/lib/money';
+import { AlertCircle, Bell, CircleUserRound, Clock, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -10,6 +12,8 @@ import { toast } from 'sonner';
 
 export function NotificationHeader() {
   const { bills, loans, creditCards, currency, nickname, setNickname } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
+  const toggleAmountsHidden = useAmountPrivacyStore((state) => state.toggleAmountsHidden);
   const [open, setOpen] = useState(false);
   const [showEditNickname, setShowEditNickname] = useState(false);
   const [nicknameDraft, setNicknameDraft] = useState(nickname || '');
@@ -110,6 +114,17 @@ export function NotificationHeader() {
             )}
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleAmountsHidden}
+              aria-pressed={amountsHidden}
+              aria-label={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+              title={amountsHidden ? 'Show amounts' : 'Hide amounts'}
+            >
+              {amountsHidden ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              <span className="sr-only">{amountsHidden ? 'Show amounts' : 'Hide amounts'}</span>
+            </Button>
             <DialogTrigger asChild>
               <Button variant="ghost" size="icon" className="relative">
                 <Bell className="h-5 w-5" />
@@ -181,7 +196,7 @@ export function NotificationHeader() {
                       <p className="text-xs text-muted-foreground">{b.category}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-destructive">{currency}{b.amount.toFixed(2)}</p>
+                      <p className="font-semibold text-destructive">{formatMoney(currency, b.amount, amountsHidden)}</p>
                       <p className="text-xs text-muted-foreground">Due: {b.dueDate}</p>
                     </div>
                   </div>
@@ -207,7 +222,7 @@ export function NotificationHeader() {
                         <p className="text-xs text-muted-foreground">Payment #{loan.repaymentSchedule.indexOf(nextEntry!) + 1}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold text-destructive">{currency}{nextEntry!.amount.toFixed(2)}</p>
+                        <p className="font-semibold text-destructive">{formatMoney(currency, nextEntry!.amount, amountsHidden)}</p>
                         <p className="text-xs text-muted-foreground">Due: {nextEntry!.dueDate}</p>
                       </div>
                     </div>
@@ -232,7 +247,7 @@ export function NotificationHeader() {
                       <p className="text-xs text-muted-foreground">{card.issuer}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-destructive">{currency}{card.currentBalance.toFixed(2)}</p>
+                      <p className="font-semibold text-destructive">{formatMoney(currency, card.currentBalance, amountsHidden)}</p>
                       <p className="text-xs text-muted-foreground">Due: {card.dueDate}</p>
                     </div>
                   </div>
@@ -256,7 +271,7 @@ export function NotificationHeader() {
                       <p className="text-xs text-muted-foreground">{b.category}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">{currency}{b.amount.toFixed(2)}</p>
+                      <p className="font-semibold">{formatMoney(currency, b.amount, amountsHidden)}</p>
                       <p className="text-xs text-muted-foreground">Due: {b.dueDate}</p>
                     </div>
                   </div>
@@ -282,7 +297,7 @@ export function NotificationHeader() {
                         <p className="text-xs text-muted-foreground">Payment #{loan.repaymentSchedule.indexOf(nextEntry!) + 1}</p>
                       </div>
                       <div className="text-right">
-                        <p className="font-semibold">{currency}{nextEntry!.amount.toFixed(2)}</p>
+                        <p className="font-semibold">{formatMoney(currency, nextEntry!.amount, amountsHidden)}</p>
                         <p className="text-xs text-muted-foreground">Due: {nextEntry!.dueDate}</p>
                       </div>
                     </div>
@@ -307,7 +322,7 @@ export function NotificationHeader() {
                       <p className="text-xs text-muted-foreground">{card.issuer}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">{currency}{card.currentBalance.toFixed(2)}</p>
+                      <p className="font-semibold">{formatMoney(currency, card.currentBalance, amountsHidden)}</p>
                       <p className="text-xs text-muted-foreground">Due: {card.dueDate}</p>
                     </div>
                   </div>

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { buildTransactionCategoryOptions } from '@/lib/transactionCategories';
 import { DUE_ITEM_BADGE_LABELS, getDueItems, settleDueItem, type DueItem } from '@/lib/dueItems';
+import { formatMoney } from '@/lib/money';
 import type { RecurringTransactionFrequency } from '@/types/finance';
 
 const formatDueDate = (value: string) => {
@@ -47,6 +49,7 @@ export default function BillsPage() {
     transactionCategories,
     sharedCategories,
   } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
 
   const [showAdd, setShowAdd] = useState(false);
 
@@ -267,7 +270,7 @@ export default function BillsPage() {
 
       <div className="flex items-center gap-2">
         <div className="text-right">
-          <p className="text-sm font-semibold text-foreground">{currency}{item.amount.toFixed(2)}</p>
+          <p className="text-sm font-semibold text-foreground">{formatMoney(currency, item.amount, amountsHidden)}</p>
           <p className={cn('text-xs font-medium', item.status === 'overdue' ? 'text-destructive' : 'text-warning')}>
             {item.status === 'overdue' ? 'Overdue' : 'Pending'}
           </p>
@@ -507,7 +510,7 @@ export default function BillsPage() {
                       <Badge variant="outline">{bill.category}</Badge>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {currency}{bill.amount.toFixed(2)} - Due: {formatDueDate(bill.dueDate)}
+                      {formatMoney(currency, bill.amount, amountsHidden)} - Due: {formatDueDate(bill.dueDate)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {(bill as any).frequency ?? 'monthly'}

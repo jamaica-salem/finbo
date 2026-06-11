@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { type CreditCard as CreditCardType } from '@/types/finance';
 import { getCreditCardTotalWithInterest } from '@/lib/interest';
+import { formatMoney } from '@/lib/money';
 
 const networkLabels: Record<CreditCardType['network'], string> = {
   visa: 'Visa',
@@ -34,7 +36,8 @@ const formatDate = (value: string) => {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 };
 
-const formatCurrency = (currency: string, amount: number) => `${currency}${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+const formatCurrency = (currency: string, amount: number, hidden: boolean) =>
+  formatMoney(currency, amount, hidden, { maximumFractionDigits: 2 });
 
 export default function CreditsPage() {
   const {
@@ -47,6 +50,7 @@ export default function CreditsPage() {
     logCreditCardPurchase,
     currency,
   } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
 
   const [showAdd, setShowAdd] = useState(false);
   const [payCardId, setPayCardId] = useState<string | null>(null);
@@ -292,8 +296,8 @@ export default function CreditsPage() {
           </div>
           <Progress value={utilization} className="h-2.5" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatCurrency(currency, card.paidAmount)} paid</span>
-            <span>{formatCurrency(currency, totalDue)} total with interest</span>
+            <span>{formatCurrency(currency, card.paidAmount, amountsHidden)} paid</span>
+            <span>{formatCurrency(currency, totalDue, amountsHidden)} total with interest</span>
           </div>
         </div>
 
@@ -303,14 +307,14 @@ export default function CreditsPage() {
               <Wallet className="h-3.5 w-3.5" />
               <span>Available credit</span>
             </div>
-            <p className="mt-1 font-medium text-foreground">{formatCurrency(currency, Math.max(0, available))}</p>
+            <p className="mt-1 font-medium text-foreground">{formatCurrency(currency, Math.max(0, available), amountsHidden)}</p>
           </div>
           <div className="rounded-lg border border-border bg-background/40 p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground">
               <PhilippinePeso className="h-3.5 w-3.5" />
               <span>Minimum due</span>
             </div>
-            <p className="mt-1 font-medium text-foreground">{formatCurrency(currency, card.minimumPayment)}</p>
+            <p className="mt-1 font-medium text-foreground">{formatCurrency(currency, card.minimumPayment, amountsHidden)}</p>
           </div>
           <div className="rounded-lg border border-border bg-background/40 p-3">
             <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -458,18 +462,18 @@ export default function CreditsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Credit Limit"
-          value={formatCurrency(currency, totalLimit)}
+          value={formatCurrency(currency, totalLimit, amountsHidden)}
           icon={<CreditCard className="h-5 w-5" />}
         />
         <StatCard
           title="Current Balance"
-          value={formatCurrency(currency, totalBalance)}
+          value={formatCurrency(currency, totalBalance, amountsHidden)}
           subtitle={`${utilizationPct}% utilization`}
           icon={<Wallet className="h-5 w-5" />}
         />
         <StatCard
           title="Minimum Due"
-          value={formatCurrency(currency, totalMinimumDue)}
+          value={formatCurrency(currency, totalMinimumDue, amountsHidden)}
           subtitle="Across all cards"
           icon={<PhilippinePeso className="h-5 w-5" />}
         />
@@ -659,7 +663,7 @@ export default function CreditsPage() {
                     </div>
                   </div>
                   <p className={cn('text-sm font-semibold', activity.type === 'payment' ? 'text-success' : 'text-foreground')}>
-                    {activity.type === 'payment' ? '-' : '+'}{formatCurrency(currency, activity.amount)}
+                    {amountsHidden ? '*****' : `${activity.type === 'payment' ? '-' : '+'}${formatCurrency(currency, activity.amount, false)}`}
                   </p>
                 </div>
               );

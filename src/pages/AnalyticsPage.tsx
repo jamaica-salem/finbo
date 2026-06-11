@@ -27,12 +27,14 @@ import {
   YAxis,
 } from 'recharts';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { StatCard } from '@/components/StatCard';
 import { PageHeader } from '@/components/PageHeader';
 import { getCategoryColor } from '@/lib/transactionCategories';
 import { PhilippinePeso } from 'lucide-react';
+import { formatMoney as formatMaskedMoney } from '@/lib/money';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -45,8 +47,8 @@ const PERIOD_OPTIONS = [
 
 type PeriodValue = (typeof PERIOD_OPTIONS)[number]['value'];
 
-const formatMoney = (currency: string, value: number) =>
-  `${currency}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatMoney = (currency: string, value: number, hidden: boolean) =>
+  formatMaskedMoney(currency, value, hidden);
 
 const startDateForPeriod = (period: PeriodValue) => {
   const now = new Date();
@@ -67,6 +69,7 @@ const getCategories = (transaction: { category: string; categories?: string[] })
 
 export default function AnalyticsPage() {
   const { transactions, currency, categoryColors } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
   const [period, setPeriod] = useState<PeriodValue>('6m');
 
   const now = new Date();
@@ -212,26 +215,26 @@ export default function AnalyticsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Spending"
-          value={formatMoney(currency, totalExpenses)}
+          value={formatMoney(currency, totalExpenses, amountsHidden)}
           subtitle={`${filteredTransactions.length} transactions in range`}
           icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
           title="Income"
-          value={formatMoney(currency, totalIncome)}
+          value={formatMoney(currency, totalIncome, amountsHidden)}
           subtitle={`Net cashflow ${netCashflow >= 0 ? 'positive' : 'negative'}`}
           icon={<TrendingUp className="h-5 w-5" />}
         />
         <StatCard
           title="Average Daily Spend"
-          value={formatMoney(currency, averageDailySpend)}
+          value={formatMoney(currency, averageDailySpend, amountsHidden)}
           subtitle={`Over the selected period`}
           icon={<Clock3 className="h-5 w-5" />}
         />
         <StatCard
           title="Top Merchant"
           value={topMerchant ? topMerchant.name : 'N/A'}
-          subtitle={topMerchant ? formatMoney(currency, topMerchant.value) : 'No merchant data yet'}
+          subtitle={topMerchant ? formatMoney(currency, topMerchant.value, amountsHidden) : 'No merchant data yet'}
           icon={<Store className="h-5 w-5" />}
         />
       </div>
@@ -263,7 +266,7 @@ export default function AnalyticsPage() {
                             <Cell key={entry.name} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(value: number) => [formatMoney(currency, value), '']} />
+                        <Tooltip formatter={(value: number) => [formatMoney(currency, value, amountsHidden), '']} />
                       </PieChart>
                     </ResponsiveContainer>
                     <div className="flex-1 space-y-2">
@@ -274,7 +277,7 @@ export default function AnalyticsPage() {
                             <span className="text-muted-foreground">{entry.name}</span>
                           </div>
                           <div className="text-right">
-                            <span className="font-medium text-foreground">{formatMoney(currency, entry.value)}</span>
+                            <span className="font-medium text-foreground">{formatMoney(currency, entry.value, amountsHidden)}</span>
                             <span className="ml-1 text-xs text-muted-foreground">
                               ({Math.round((entry.value / totalExpenses) * 100)}%)
                             </span>
@@ -304,7 +307,7 @@ export default function AnalyticsPage() {
                       <div key={merchant.name} className="space-y-1">
                         <div className="flex items-center justify-between text-sm">
                           <span className="font-medium text-foreground">{merchant.name}</span>
-                          <span className="text-muted-foreground">{formatMoney(currency, merchant.value)}</span>
+                          <span className="text-muted-foreground">{formatMoney(currency, merchant.value, amountsHidden)}</span>
                         </div>
                         <div className="h-2 rounded-full bg-muted">
                           <div
@@ -339,10 +342,10 @@ export default function AnalyticsPage() {
                   <LineChart data={monthlyTrend}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 90%)" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} />
+                    <YAxis tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} tickFormatter={(value) => amountsHidden ? '*****' : String(value)} />
                     <Tooltip
                       contentStyle={{ background: 'hsl(0, 0%, 100%)', border: '1px solid hsl(220, 14%, 90%)', borderRadius: '8px', fontSize: '12px' }}
-                      formatter={(value: number) => [formatMoney(currency, value), '']}
+                      formatter={(value: number) => [formatMoney(currency, value, amountsHidden), '']}
                     />
                     <Line type="monotone" dataKey="income" stroke="hsl(172, 66%, 40%)" strokeWidth={2} dot={{ r: 3 }} name="Income" />
                     <Line type="monotone" dataKey="expenses" stroke="hsl(0, 72%, 55%)" strokeWidth={2} dot={{ r: 3 }} name="Expenses" />
@@ -364,10 +367,10 @@ export default function AnalyticsPage() {
                   <AreaChart data={monthBreakdown}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 14%, 90%)" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} />
-                    <YAxis tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} />
+                    <YAxis tick={{ fontSize: 11, fill: 'hsl(220, 10%, 46%)' }} tickFormatter={(value) => amountsHidden ? '*****' : String(value)} />
                     <Tooltip
                       contentStyle={{ background: 'hsl(0, 0%, 100%)', border: '1px solid hsl(220, 14%, 90%)', borderRadius: '8px', fontSize: '12px' }}
-                      formatter={(value: number) => [formatMoney(currency, value), '']}
+                      formatter={(value: number) => [formatMoney(currency, value, amountsHidden), '']}
                     />
                     <Legend />
                     <Area type="monotone" dataKey="expenses" stroke="hsl(0, 72%, 55%)" fill="hsl(0, 72%, 55%)" fillOpacity={0.15} name="Expenses" />
@@ -383,7 +386,7 @@ export default function AnalyticsPage() {
                         <div key={day.name} className="space-y-1">
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">{day.name}</span>
-                            <span className="font-medium text-foreground">{formatMoney(currency, day.value)}</span>
+                            <span className="font-medium text-foreground">{formatMoney(currency, day.value, amountsHidden)}</span>
                           </div>
                           <div className="h-2 rounded-full bg-muted">
                             <div
@@ -414,7 +417,7 @@ export default function AnalyticsPage() {
               <div className="rounded-xl border border-border bg-muted/30 p-4">
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Top category</p>
                 <p className="mt-2 text-sm font-medium text-foreground">
-                  {topCategory ? `${topCategory.name} with ${formatMoney(currency, topCategory.value)}` : 'No category data yet'}
+                  {topCategory ? `${topCategory.name} with ${formatMoney(currency, topCategory.value, amountsHidden)}` : 'No category data yet'}
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-4">
@@ -429,8 +432,8 @@ export default function AnalyticsPage() {
                 <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Budget watch</p>
                 <p className="mt-2 text-sm font-medium text-foreground">
                   {netCashflow >= 0
-                    ? `You are spending ${formatMoney(currency, totalExpenses)} against ${formatMoney(currency, totalIncome)} income in this period.`
-                    : `Spending is outpacing income by ${formatMoney(currency, Math.abs(netCashflow))}.`}
+                    ? `You are spending ${formatMoney(currency, totalExpenses, amountsHidden)} against ${formatMoney(currency, totalIncome, amountsHidden)} income in this period.`
+                    : `Spending is outpacing income by ${formatMoney(currency, Math.abs(netCashflow), amountsHidden)}.`}
                 </p>
               </div>
             </CardContent>

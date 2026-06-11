@@ -8,6 +8,7 @@ import { SecurityGate } from "@/components/SecurityGate";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import { useFinanceStore } from "@/store/financeStore";
+import { useAmountPrivacyStore } from "@/store/amountPrivacyStore";
 import Dashboard from "./pages/Dashboard";
 import AccountsPage from "./pages/AccountsPage";
 import LoansPage from "./pages/LoansPage";
@@ -81,19 +82,20 @@ function BudgetAlertMonitor() {
   const transactions = useFinanceStore((state) => state.transactions);
   const budgets = useFinanceStore((state) => state.budgets);
   const checkBudgetAlerts = useFinanceStore((state) => state.checkBudgetAlerts);
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
 
   useEffect(() => {
     const alerts = checkBudgetAlerts();
     alerts.forEach((alert) => {
-      const amount = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(alert.spent);
-      const limit = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(alert.limitAmount);
+      const amount = amountsHidden ? '*****' : new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(alert.spent);
+      const limit = amountsHidden ? '*****' : new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(alert.limitAmount);
       if (alert.severity === 'over') {
         toast.error(`Budget exceeded: ${alert.category} is now ${amount} of ${limit}.`);
       } else {
         toast.warning(`Budget warning: ${alert.category} has reached ${Math.round(alert.thresholdPct)}% of its limit.`);
       }
     });
-  }, [budgets, checkBudgetAlerts, transactions]);
+  }, [amountsHidden, budgets, checkBudgetAlerts, transactions]);
 
   return null;
 }

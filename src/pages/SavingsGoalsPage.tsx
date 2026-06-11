@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { StatCard } from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,11 +15,12 @@ import { Plus, Target, Sparkles, Gift, Pencil, Trash2, PhilippinePeso, CalendarD
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { SavingsGoalCategory } from '@/types/finance';
+import { formatMoney as formatMaskedMoney } from '@/lib/money';
 
 const DEFAULT_GOAL_CATEGORIES: SavingsGoalCategory[] = ['Vacation', 'Emergency Fund', 'Home', 'Education', 'Tech', 'Other'];
 
-const formatMoney = (currency: string, amount: number) =>
-  `${currency}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatMoney = (currency: string, amount: number, hidden: boolean) =>
+  formatMaskedMoney(currency, amount, hidden);
 
 const formatDate = (value?: string) => {
   if (!value) return 'No date set';
@@ -38,6 +40,7 @@ export default function SavingsGoalsPage() {
     currency,
     savingsCategories,
   } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
 
   const [showAdd, setShowAdd] = useState(false);
   const [contributeGoalId, setContributeGoalId] = useState<string | null>(null);
@@ -151,11 +154,11 @@ export default function SavingsGoalsPage() {
 
     if (!wasComplete && goal.savedAmount + amount >= goal.targetAmount) {
       toast.success(`Goal completed: ${goal.name}`, {
-        description: `You reached ${formatMoney(currency, goal.targetAmount)} and unlocked the celebration.`,
+        description: `You reached ${formatMoney(currency, goal.targetAmount, amountsHidden)} and unlocked the celebration.`,
       });
     } else {
       toast('Contribution added', {
-        description: `Added ${formatMoney(currency, amount)} to ${goal.name}.`,
+        description: `Added ${formatMoney(currency, amount, amountsHidden)} to ${goal.name}.`,
       });
     }
 
@@ -221,8 +224,8 @@ export default function SavingsGoalsPage() {
           </div>
           <Progress value={pct} className="h-2.5" />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{formatMoney(currency, goal.savedAmount)} saved</span>
-            <span>{formatMoney(currency, remaining)} left</span>
+            <span>{formatMoney(currency, goal.savedAmount, amountsHidden)} saved</span>
+            <span>{formatMoney(currency, remaining, amountsHidden)} left</span>
           </div>
         </div>
 
@@ -314,13 +317,13 @@ export default function SavingsGoalsPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Total Saved"
-          value={formatMoney(currency, totalSaved)}
+          value={formatMoney(currency, totalSaved, amountsHidden)}
           subtitle={`${savingsGoals.length} goal${savingsGoals.length === 1 ? '' : 's'}`}
           icon={<PhilippinePeso className="h-5 w-5" />}
         />
         <StatCard
           title="Total Target"
-          value={formatMoney(currency, totalTarget)}
+          value={formatMoney(currency, totalTarget, amountsHidden)}
           subtitle={`${progress}% overall progress`}
           icon={<Target className="h-5 w-5" />}
         />
@@ -352,8 +355,8 @@ export default function SavingsGoalsPage() {
         <div className="mt-4 space-y-2">
           <Progress value={progress} className="h-3" />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{formatMoney(currency, totalSaved)} saved</span>
-            <span>{formatMoney(currency, totalTarget)} target</span>
+            <span>{formatMoney(currency, totalSaved, amountsHidden)} saved</span>
+            <span>{formatMoney(currency, totalTarget, amountsHidden)} target</span>
           </div>
         </div>
       </div>
@@ -492,7 +495,7 @@ export default function SavingsGoalsPage() {
                       {formatDate(contribution.date)}{contribution.note ? ` • ${contribution.note}` : ''}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold text-success">{formatMoney(currency, contribution.amount)}</p>
+                  <p className="text-sm font-semibold text-success">{formatMoney(currency, contribution.amount, amountsHidden)}</p>
                 </div>
               );
             })

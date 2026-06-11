@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Plus, Pencil, Trash2, TriangleAlert, CheckCircle2, Target, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +19,7 @@ import { buildTransactionCategoryOptions } from '@/lib/transactionCategories';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import type { MonthlyBudget } from '@/types/finance';
 import { PhilippinePeso } from 'lucide-react';
+import { formatMoney as formatMaskedMoney } from '@/lib/money';
 
 const normalizeCategory = (value: string) => value.trim().toLowerCase();
 const asDate = (value: string) => {
@@ -52,6 +54,7 @@ export default function BudgetPage() {
     deleteBudget,
     currency,
   } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
 
   const [showBudgetDialog, setShowBudgetDialog] = useState(false);
   const [editingBudgetId, setEditingBudgetId] = useState<string | null>(null);
@@ -206,8 +209,7 @@ export default function BudgetPage() {
     setPendingDelete(null);
   };
 
-  const formatMoney = (value: number) =>
-    `${currency}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const formatMoney = (value: number) => formatMaskedMoney(currency, value, amountsHidden);
 
   return (
     <div className="space-y-6">

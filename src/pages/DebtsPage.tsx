@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { ArrowDownLeft, ArrowUpRight, CalendarClock, HandCoins, Pencil, Plus, ReceiptText, Trash2, Wallet } from 'lucide-react';
 import { useFinanceStore } from '@/store/financeStore';
+import { useAmountPrivacyStore } from '@/store/amountPrivacyStore';
 import type { PersonalDebt, PersonalDebtDirection } from '@/types/finance';
 import { PageHeader } from '@/components/PageHeader';
 import { StatCard } from '@/components/StatCard';
@@ -14,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { formatMoney } from '@/lib/money';
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 
@@ -24,8 +26,8 @@ const formatDate = (value?: string) => {
   return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(date);
 };
 
-const formatCurrency = (currency: string, amount: number) =>
-  `${currency}${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatCurrency = (currency: string, amount: number, hidden: boolean) =>
+  formatMoney(currency, amount, hidden);
 
 const getRemaining = (debt: PersonalDebt) => Math.max(0, debt.amount - debt.paidAmount);
 
@@ -40,6 +42,7 @@ export default function DebtsPage() {
     logPersonalDebtPayment,
     currency,
   } = useFinanceStore();
+  const amountsHidden = useAmountPrivacyStore((state) => state.amountsHidden);
 
   const [showAdd, setShowAdd] = useState(false);
   const [direction, setDirection] = useState<PersonalDebtDirection>('iOwe');
@@ -227,8 +230,8 @@ export default function DebtsPage() {
           </div>
           <Progress value={progress} className="h-2.5" />
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>{formatCurrency(currency, debt.paidAmount)} paid</span>
-            <span>{formatCurrency(currency, debt.amount)} total</span>
+            <span>{formatCurrency(currency, debt.paidAmount, amountsHidden)} paid</span>
+            <span>{formatCurrency(currency, debt.amount, amountsHidden)} total</span>
           </div>
         </div>
 
@@ -239,7 +242,7 @@ export default function DebtsPage() {
               <span>Remaining</span>
             </div>
             <p className={cn('mt-1 font-medium', isIOwe ? 'text-destructive' : 'text-success')}>
-              {formatCurrency(currency, remaining)}
+              {formatCurrency(currency, remaining, amountsHidden)}
             </p>
           </div>
           <div className="rounded-lg border border-border bg-background/40 p-3">
@@ -317,11 +320,11 @@ export default function DebtsPage() {
       />
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatCard title="I Owe" value={formatCurrency(currency, totalIOwe)} subtitle={`${debtsIOwe.length} active`} icon={<ArrowUpRight className="h-5 w-5" />} />
-        <StatCard title="Owed To Me" value={formatCurrency(currency, totalOwedToMe)} subtitle={`${debtsOwedToMe.length} active`} icon={<ArrowDownLeft className="h-5 w-5" />} />
+        <StatCard title="I Owe" value={formatCurrency(currency, totalIOwe, amountsHidden)} subtitle={`${debtsIOwe.length} active`} icon={<ArrowUpRight className="h-5 w-5" />} />
+        <StatCard title="Owed To Me" value={formatCurrency(currency, totalOwedToMe, amountsHidden)} subtitle={`${debtsOwedToMe.length} active`} icon={<ArrowDownLeft className="h-5 w-5" />} />
         <StatCard
           title="Net Debt Position"
-          value={formatCurrency(currency, netReceivable)}
+          value={formatCurrency(currency, netReceivable, amountsHidden)}
           valueClassName={netReceivable < 0 ? 'text-destructive' : netReceivable > 0 ? 'text-success' : undefined}
           subtitle="Owed to me - I owe"
           icon={<HandCoins className="h-5 w-5" />}
@@ -336,7 +339,7 @@ export default function DebtsPage() {
             {paymentDebt ? (
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
                 <p className="font-medium text-foreground">{paymentDebt.personName}</p>
-                <p className="text-muted-foreground">Remaining: {formatCurrency(currency, getRemaining(paymentDebt))}</p>
+                <p className="text-muted-foreground">Remaining: {formatCurrency(currency, getRemaining(paymentDebt), amountsHidden)}</p>
               </div>
             ) : null}
             <div className="space-y-1.5">
@@ -447,7 +450,7 @@ export default function DebtsPage() {
                       {formatDate(payment.date)}{payment.note ? ` - ${payment.note}` : ''}
                     </p>
                   </div>
-                  <p className="text-sm font-semibold text-foreground">{formatCurrency(currency, payment.amount)}</p>
+                  <p className="text-sm font-semibold text-foreground">{formatCurrency(currency, payment.amount, amountsHidden)}</p>
                 </div>
               );
             })}
