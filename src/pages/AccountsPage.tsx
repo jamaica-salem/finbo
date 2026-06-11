@@ -63,6 +63,13 @@ export default function AccountsPage() {
   const [editABal, setEditABal] = useState('0');
   const [editAccountErrors, setEditAccountErrors] = useState<{ name?: string; balance?: string }>({});
 
+  // Add money to account
+  const [addMoneyAccountId, setAddMoneyAccountId] = useState<string | null>(null);
+  const [addMoneyAmount, setAddMoneyAmount] = useState('0');
+  const [addMoneyDescription, setAddMoneyDescription] = useState('');
+  const [addMoneyDate, setAddMoneyDate] = useState(new Date().toISOString().split('T')[0]);
+  const [addMoneyErrors, setAddMoneyErrors] = useState<{ amount?: string; date?: string }>({});
+
   // Add account form
   const [aName, setAName] = useState('');
   const [aType, setAType] = useState<AccountType>('bank');
@@ -182,6 +189,42 @@ export default function AccountsPage() {
     updateAccount(editAccountId, { name: editAName.trim(), type: editAType, balance });
     setEditAccountErrors({});
     setEditAccountId(null);
+  };
+
+  const openAddMoney = (id: string) => {
+    setAddMoneyErrors({});
+    setAddMoneyAccountId(id);
+    setAddMoneyAmount('0');
+    setAddMoneyDescription('');
+    setAddMoneyDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const handleAddMoney = () => {
+    setAddMoneyErrors({});
+    const errors: typeof addMoneyErrors = {};
+    const amount = Number(addMoneyAmount);
+    if (!addMoneyAccountId) return;
+    if (!Number.isFinite(amount) || amount <= 0) errors.amount = 'Amount must be greater than 0';
+    if (!addMoneyDate) errors.date = 'Date is required';
+    if (Object.keys(errors).length > 0) {
+      setAddMoneyErrors(errors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
+    addTransaction({
+      accountId: addMoneyAccountId,
+      type: 'income',
+      amount,
+      category: 'Income',
+      categories: ['Income'],
+      tags: [],
+      description: addMoneyDescription.trim() || 'Added money',
+      date: addMoneyDate,
+    });
+    setAddMoneyErrors({});
+    setAddMoneyAccountId(null);
+    toast.success('Money added');
   };
 
   const handleAddTx = () => {
@@ -778,6 +821,56 @@ export default function AccountsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Add Money Dialog */}
+      <Dialog
+        open={!!addMoneyAccountId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setAddMoneyAccountId(null);
+            setAddMoneyErrors({});
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              Add Money{addMoneyAccountId ? ` to ${accounts.find((account) => account.id === addMoneyAccountId)?.name ?? 'Account'}` : ''}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Amount</Label>
+              <Input
+                placeholder="0.00"
+                type="number"
+                min="0"
+                step="0.01"
+                value={addMoneyAmount}
+                onChange={(e) => setAddMoneyAmount(e.target.value)}
+              />
+              {addMoneyErrors.amount ? <p className="text-sm text-destructive">{addMoneyErrors.amount}</p> : null}
+            </div>
+            <div className="space-y-1.5">
+              <Label>Description</Label>
+              <Input
+                placeholder="e.g. Cash deposit"
+                value={addMoneyDescription}
+                onChange={(e) => setAddMoneyDescription(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Date</Label>
+              <Input type="date" value={addMoneyDate} onChange={(e) => setAddMoneyDate(e.target.value)} />
+              {addMoneyErrors.date ? <p className="text-sm text-destructive">{addMoneyErrors.date}</p> : null}
+            </div>
+            <Button className="w-full bg-success text-success-foreground hover:bg-success/90" onClick={handleAddMoney}>
+              <Plus className="mr-1 h-4 w-4" />
+              Add Money
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog
         open={!!editTxId}
         onOpenChange={() => {
@@ -1060,6 +1153,15 @@ export default function AccountsPage() {
                   </div>
                 </div>
                 <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 bg-success/10 text-success hover:bg-success/20 hover:text-success"
+                    aria-label={`Add money to ${a.name}`}
+                    onClick={(e) => { e.stopPropagation(); openAddMoney(a.id); }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={(e) => { e.stopPropagation(); openEditAccount(a.id); }}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
