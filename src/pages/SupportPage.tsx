@@ -13,22 +13,22 @@ type SupportMethod = {
 
 const supportMethods: SupportMethod[] = [
   {
-    title: 'Bank Account 1',
-    description: 'Scan to send support directly to my first bank account.',
-    icon: Building2,
-    qrSrc: '/placeholder.svg',
-  },
-  {
-    title: 'Bank Account 2',
-    description: 'Scan to send support directly to my second bank account.',
-    icon: Wallet,
-    qrSrc: '/placeholder.svg',
-  },
-  {
-    title: 'E-Wallet',
-    description: 'Scan to send support through my e-wallet.',
+    title: 'GCash',
+    description: 'Scan to send support via GCash (InstaPay).',
     icon: Smartphone,
-    qrSrc: '/placeholder.svg',
+    qrSrc: '/qr/gcash.jpeg',
+  },
+  {
+    title: 'MariBank',
+    description: 'Scan to send support via MariBank (InstaPay).',
+    icon: Building2,
+    qrSrc: '/qr/maribank.png',
+  },
+  {
+    title: 'PayPal',
+    description: 'Scan to pay or send support via PayPal.',
+    icon: Wallet,
+    qrSrc: '/qr/paypal.jpeg',
   },
 ];
 
